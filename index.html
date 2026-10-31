@@ -1,6 +1,22 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-48.png" sizes="48x48" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1a1220">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pour Decisions">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="description" content="A pass-the-phone party card game for 2 to 12 players.">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pour Decisions</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -273,6 +289,10 @@ body.xmas #snowLayer { display: block; }
 .badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
 .badges span { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; }
 @media (prefers-reduced-motion: reduce) { .hero, .bubbles i, .spread, .pc, .scene * { animation: none !important; } .bubbles { display: none; } }
+#installSlot { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 8px; }
+#installSlot:empty { display: none; }
+#installSlot .btn { width: 100%; }
+#installSlot p { margin: 0; color: var(--muted); font-size: .88rem; line-height: 1.4; }
 .foot-note { text-align: center; color: var(--muted); font-size: .8rem; line-height: 1.5; }
 .sync { font-size: .78rem; color: var(--muted); text-align: center; }
 .sync b { color: var(--secret); font-family: var(--mono); letter-spacing: .1em; }
@@ -693,7 +713,8 @@ function render() {
   document.body.classList.toggle("spooky", S.theme === "halloween");
   document.body.classList.toggle("xmas", S.theme === "christmas");
   if (screen === "awards") $("#batLayer")?.replaceChildren();
-  $("#app").innerHTML = screen === "welcome" ? welcomeView() : screen === "setup" ? setupView() : screen === "awards" ? awardsView() : gameView(flip);  tickTimer();
+  $("#app").innerHTML = screen === "welcome" ? welcomeView() : screen === "setup" ? setupView() : screen === "awards" ? awardsView() : gameView(flip);
+  if (screen === "welcome") paintInstall();  tickTimer();
 }
 
 // Intro spread, back to front: [kind, corner letter, symbol, name, rotation, x, y,
@@ -801,6 +822,7 @@ function welcomeView() {
       <li><b>Draw</b>a card each turn</li>
       <li><b>Decide</b>do it or drink</li>
     </ol>
+    <div id="installSlot"></div>
     <div class="badges"><span>18+</span><span>${window.claude ? "One phone or many" : "Pass the phone"}</span><span>Water counts</span></div>
   </main>`;
 }
@@ -1158,6 +1180,7 @@ document.addEventListener("click", e => {
   if (t.id === "start") { L.screen = "game"; return mutate(() => { if (!S.deck.length) buildDeck(); if (S.turn >= S.players.length) S.turn = 0; }, false); }
   if (t.id === "reset" || t.id === "again") { L.screen = "game"; return mutate(() => resetGame()); }
   if (t.id === "menu") { L.screen = "setup"; return render(); }
+  if (t.id === "install") return installApp();
   if (t.id === "fan") {
     t.getAnimations({ subtree: true }).forEach(a => { a.cancel(); a.play(); });
     return;
@@ -1505,6 +1528,31 @@ setInterval(() => {
 
 // Promille drops over time, so refresh the numbers every minute while playing.
 setInterval(() => { if (S && L.screen === "game") render(); }, 60000);
+
+// Install on the phone (hosted copy only; claude.ai pages can't install or work offline).
+// Android and desktop Chrome offer a real install prompt. iPhones have none, so the button explains the Share menu.
+const installed = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let installEvent = null, iosHelp = false;
+function paintInstall() {
+  const slot = $("#installSlot");
+  if (!slot) return;
+  if (window.claude || installed() || !(installEvent || isIOS())) { slot.innerHTML = ""; return; }
+  slot.innerHTML = `<button type="button" class="btn ghost" id="install">Add to home screen</button>${iosHelp ? `<p>Tap the Share button in your browser, then <b>Add to Home Screen</b>. The game then opens like an app and works offline.</p>` : ""}`;
+}
+async function installApp() {
+  if (!installEvent) { iosHelp = !iosHelp; return paintInstall(); }
+  const prompt = installEvent;
+  installEvent = null;
+  prompt.prompt();
+  await prompt.userChoice.catch(() => {});
+  paintInstall();
+}
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvent = e; paintInstall(); });
+addEventListener("appinstalled", () => { installEvent = null; paintInstall(); toast("Installed. Find Pour Decisions on your home screen."); });
+if (!window.claude && "serviceWorker" in navigator && isSecureContext) {
+  addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
 
 function start(data) {
   S = fresh(data && data.S ? data.S : load());
