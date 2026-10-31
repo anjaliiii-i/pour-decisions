@@ -1,0 +1,1524 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pour Decisions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Playfair+Display:ital,wght@1,700;1,800&family=Figtree:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one-screen bar-table app. Player rail on top, a single big card in the middle, actions below. Deliberately single dark theme (a dim bar). */
+:root {
+  color-scheme: dark;
+  --bg: #1a1220;
+  --bg-2: #241a2c;
+  --line: #3a2d44;
+  --fg: #f5ecdf;
+  --muted: #b3a5b8;
+  --amber: #f4a940;
+  --dare: #ff6b57;
+  --truth: #5cc8ff;
+  --rule: #f4c542;
+  --all: #4fd6a3;
+  --duel: #b38cff;
+  --gift: #ff7fb5;
+  --cat: #f49a52;
+  --secret: #9bd84f;
+  --water: #7aa7ff;
+  --card-ink: #1a1220;
+  --display: "Shrikhand", "Georgia", serif;
+  --body: "Figtree", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+html, body { height: 100%; }
+body {
+  background: radial-gradient(120% 80% at 50% 0%, #2c1d36 0%, var(--bg) 60%) fixed, var(--bg);
+  color: var(--fg);
+  font-family: var(--body);
+  font-size: 16px;
+}
+.app {
+  max-width: 560px; margin: 0 auto; min-height: 100%;
+  display: flex; flex-direction: column; gap: 18px;
+  padding-block: 20px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+}
+h1 { font-family: var(--display); font-weight: 400; font-size: 2.6rem; line-height: 1; margin: 0; color: var(--amber); text-wrap: balance; letter-spacing: .01em; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 1.7rem; margin: 0; color: var(--fg); text-wrap: balance; }
+.tag { color: var(--muted); margin: 6px 0 0; line-height: 1.45; }
+.label { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+button { font: inherit; cursor: pointer; border: 0; border-radius: 12px; color: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+/* setup */
+.panel { background: var(--bg-2); border: 1px solid var(--line); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.add-row { display: flex; gap: 8px; }
+.add-row input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; color: var(--fg); font: inherit; }
+.btn { background: var(--amber); color: var(--card-ink); font-weight: 800; padding: 12px 18px; }
+.btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--fg); font-weight: 600; }
+.btn.small { padding: 8px 12px; font-size: .88rem; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.roster { display: flex; flex-direction: column; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.prow { display: grid; grid-template-columns: 1fr auto; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 10px 10px 10px 14px; }
+.prow .pn { font-weight: 800; align-self: center; min-width: 0; overflow-wrap: anywhere; }
+.prow .x { width: 30px; height: 30px; border-radius: 50%; background: var(--line); }
+.prow .opts { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.prow select, .prow input, .field { min-width: 0; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px; color: var(--fg); font: inherit; font-size: .88rem; }
+.seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 6px; }
+.seg button { background: var(--bg); border: 1px solid var(--line); padding: 10px 6px; font-weight: 600; font-size: .92rem; }
+.seg button[aria-pressed="true"] { background: var(--amber); color: var(--card-ink); border-color: var(--amber); }
+.hint { color: var(--muted); font-size: .88rem; line-height: 1.45; margin: 0; }
+.legend { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; font-size: .88rem; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; background: var(--c); vertical-align: -1px; }
+.table-code { font-family: var(--mono); font-size: 1.6rem; letter-spacing: .2em; color: var(--amber); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row > .field { flex: 1 1 120px; }
+
+/* game */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.top h1 { font-size: 1.6rem; }
+.tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.rail { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.chip { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: var(--bg-2); border: 1px solid var(--line); padding: 8px 12px; min-width: 76px; text-align: left; transition: transform .15s; }
+.chip .n { font-weight: 800; font-size: .95rem; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip .s { font-family: var(--mono); font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chip .pm { font-family: var(--mono); font-size: .78rem; color: var(--fg); font-variant-numeric: tabular-nums; }
+.chip.now { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber) inset; }
+.chip.now .s { color: var(--amber); }
+.chip.pick { border-color: var(--gift); animation: pulse 1s infinite; }
+.chip.bump { transform: scale(1.08); }
+@keyframes pulse { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--gift) 35%, transparent); } }
+
+.turn { text-align: center; }
+.turn strong { font-family: var(--display); font-weight: 400; font-size: 1.9rem; color: var(--fg); display: block; line-height: 1.1; margin-top: 4px; overflow-wrap: anywhere; }
+
+.stage { perspective: 1200px; display: flex; justify-content: center; }
+.card {
+  --c: var(--amber);
+  width: 100%; max-width: 360px; aspect-ratio: 5 / 7; max-height: 56vh;
+  background: var(--fg); color: var(--card-ink);
+  border-radius: 22px; padding: 22px; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 14px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.45), 0 0 0 8px var(--c) inset;
+  position: relative;
+}
+.card.flip { animation: flip .45s cubic-bezier(.2,.8,.2,1); }
+@keyframes flip { from { transform: rotateY(90deg) translateY(10px); opacity: .3; } to { transform: none; opacity: 1; } }
+.card .kind { display: flex; justify-content: space-between; align-items: center; padding: 6px 4px 0; gap: 8px; }
+.card .kind b { font-family: var(--display); font-weight: 400; font-size: 1.5rem; color: var(--c); filter: brightness(.82); }
+.card .kind i { font-style: normal; font-family: var(--mono); font-size: .8rem; background: var(--card-ink); color: var(--fg); padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+.card .txt { flex: 1; display: flex; align-items: center; padding: 0 6px; font-size: clamp(1.15rem, 4.6vw, 1.45rem); line-height: 1.35; font-weight: 600; text-wrap: pretty; overflow-wrap: anywhere; overflow-y: auto; }
+.card .txt em { font-style: normal; font-weight: 800; background: color-mix(in srgb, var(--c) 35%, transparent); padding: 0 4px; border-radius: 4px; }
+.card .foot { font-size: .8rem; color: #6b5d70; text-align: center; padding-bottom: 6px; }
+.card .timer { align-self: center; font-family: var(--mono); font-size: .95rem; background: var(--card-ink); color: var(--fg); padding: 8px 14px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.card .timer.run { background: var(--c); color: var(--card-ink); }
+.card .timer.out { background: var(--dare); color: var(--card-ink); }
+.card.back { background: var(--bg-2); color: var(--fg); box-shadow: 0 18px 40px rgba(0,0,0,.45), 0 0 0 1px var(--line) inset; align-items: center; justify-content: center; text-align: center; cursor: pointer; background-image: repeating-linear-gradient(45deg, transparent 0 14px, rgba(244,169,64,.07) 14px 28px); }
+.card.back .big { font-family: var(--display); font-size: 2.6rem; color: var(--amber); }
+.card.back p { color: var(--muted); margin: 0; }
+.card.hidden { background: #233019; color: var(--fg); box-shadow: 0 18px 40px rgba(0,0,0,.45), 0 0 0 8px var(--secret) inset; align-items: center; justify-content: center; text-align: center; }
+.card.hidden .big { font-family: var(--display); font-size: 2rem; color: var(--secret); }
+.card.hidden p { margin: 0; color: var(--muted); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.actions .btn { flex: 1 1 140px; }
+.refill { background: var(--bg-2); border: 1px solid var(--amber); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.refill b { font-family: var(--display); font-weight: 400; font-size: 1.3rem; color: var(--amber); }
+.refill p { margin: 0; color: var(--fg); line-height: 1.4; font-size: .95rem; }
+.refill .row .btn { flex: 1 1 130px; }
+.picker { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.picker .who { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.picker .who button { background: var(--bg-2); border: 1px solid var(--line); padding: 10px 14px; font-weight: 600; }
+.picker .who button[aria-pressed="true"] { background: var(--all); border-color: var(--all); color: var(--card-ink); }
+.picker .row .btn { flex: 1 1 0; }
+.list { display: flex; flex-direction: column; gap: 8px; }
+.list ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.list li { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; background: var(--bg-2); border-left: 3px solid var(--rule); border-radius: 8px; padding: 10px 10px 10px 12px; font-size: .92rem; line-height: 1.4; }
+.list li > span { flex: 1 1 180px; min-width: 0; }
+.list li small { color: var(--muted); display: block; }
+.list li .plain { background: transparent; color: var(--muted); padding: 2px 6px; }
+.list.missions li { border-left-color: var(--secret); }
+.board ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.board li { display: grid; grid-template-columns: minmax(0, 7rem) 1fr auto; align-items: center; gap: 10px; font-size: .9rem; }
+.board li .bn { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board .bar { height: 10px; background: var(--bg); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+.board .bar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--all), var(--amber) 55%, var(--dare)); background-size: 100vw 100%; }
+.board .bv { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; min-width: 4.5rem; }
+.board .bv small { display: block; font-family: var(--body); color: var(--muted); font-size: .72rem; }
+.awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.award { background: var(--bg-2); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 4px; }
+.award b { font-family: var(--display); font-weight: 400; font-size: 1.15rem; color: var(--amber); }
+.award strong { font-size: 1.1rem; overflow-wrap: anywhere; }
+.award span { color: var(--muted); font-size: .85rem; font-family: var(--mono); }
+/* welcome */
+.welcome { min-height: calc(100vh - 60px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center; padding-block: 12px; }
+.fan { position: relative; width: 280px; max-width: 100%; height: 236px; }
+/* Intro: a pinwheel spread of card faces, like a hand of playing cards tossed on the table.
+   On load the cards fan out from one pile into their angles, then the whole spread sways slowly. */
+.spread { position: absolute; left: calc(50% + 14px); top: 50%; width: 0; height: 0; animation: sway 7s ease-in-out 3.8s infinite; }
+.pc {
+  --c: var(--dare); --r: 0deg; --x: 0px; --y: 0px; --k: 1;
+  position: absolute; left: -62px; top: -86px; width: 124px; height: 172px; box-sizing: border-box;
+  background: var(--fg); border-radius: 14px; padding: 10px 11px;
+  box-shadow: 0 0 0 1px #d9cdbb inset, -4px 8px 18px rgba(0,0,0,.45);
+  transform: translate(var(--x), var(--y)) rotate(var(--r));
+  animation: flyin 2.8s both;
+}
+.pc .corner { display: flex; flex-direction: column; align-items: center; width: 26px; line-height: 1; color: var(--c); filter: brightness(.8); }
+.pc .corner b { font-family: var(--display); font-weight: 400; font-size: 1.5rem; }
+.pc .corner i { font-style: normal; font-family: var(--display); font-size: 1rem; margin-top: 2px; }
+.pc .pip { position: absolute; right: 16px; bottom: 14px; font-family: var(--display); font-size: 3.6rem; line-height: 1; color: var(--c); filter: brightness(.8); }
+.pc .name { position: absolute; left: 12px; bottom: 16px; font-size: .62rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 800; color: var(--c); filter: brightness(.7); }
+/* Each card flies in spinning from its own edge of the screen, lands loosely in a messy pile,
+   then glides calmly into the fan. Tap the spread to throw them in again. */
+@keyframes flyin {
+  0%   { transform: translate(calc(var(--fx) * var(--k)), calc(var(--fy) * var(--k))) rotate(var(--fr)); animation-timing-function: cubic-bezier(.15,.6,.3,1); }
+  42%  { transform: translate(calc(var(--x) + var(--ox)), calc(var(--y) + var(--oy))) rotate(calc(var(--r) + var(--or))); animation-timing-function: cubic-bezier(.45,0,.25,1); }
+  100% { transform: translate(var(--x), var(--y)) rotate(var(--r)); }
+}
+html, body { overflow-x: clip; }
+.spread-wrap { position: absolute; inset: 0; }
+
+/* Halloween Special: pumpkin accent, moonlit background, and an original cartoon vampire whose cards land on his table. */
+body.spooky { --amber: #ff8a3d; background: radial-gradient(120% 70% at 50% 0%, #1f2650 0%, #171230 45%, var(--bg) 75%) fixed, var(--bg); }
+.scene { position: absolute; left: 50%; top: 0; width: 340px; max-width: 100vw; height: auto; transform: translateX(-50%); }
+.fan.scened { width: 340px; height: 300px; }
+.fan.scened .spread-wrap { transform: translateY(96px) scale(.58); }
+.fan.scened .pc { --k: 1.73; } /* undo the .58 scale so fly-in starts stay off-screen */
+.fan.scened .bubbles { display: none; }
+.scene .flame { transform-box: fill-box; transform-origin: 50% 100%; animation: flicker 1.6s ease-in-out infinite; }
+.scene .flame.b { animation-duration: 2.1s; animation-delay: -.7s; }
+.scene .glow { animation: glowpulse 2.4s ease-in-out infinite; }
+.scene .bat { animation: flap .5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+.scene .bats { animation: drift 9s ease-in-out infinite; }
+@keyframes flicker { 0%, 100% { transform: scale(1, 1) rotate(-2deg); } 40% { transform: scale(.9, 1.12) rotate(3deg); } 70% { transform: scale(1.05, .94) rotate(-1deg); } }
+@keyframes glowpulse { 50% { opacity: .55; } }
+@keyframes flap { to { transform: scaleY(.55); } }
+@keyframes drift { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-14px, 6px); } }
+/* Plain black bats that cross the screen now and then during the game (Halloween Special only). */
+#batLayer { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; }
+.toast { z-index: 6; }
+.bat-fly { position: absolute; left: 0; top: 0; }
+.bat-fly svg { display: block; width: 100%; height: auto; }
+.bat-fly .wings { transform-box: fill-box; transform-origin: 50% 40%; animation: flap .16s ease-in-out infinite alternate; }
+.cat-walk .leg { transform-box: fill-box; transform-origin: 50% 0; animation: step .42s ease-in-out infinite alternate; }
+.cat-walk .leg.b { animation-delay: -.42s; }
+.cat-walk .tail { transform-box: fill-box; transform-origin: 100% 100%; animation: tailsway 1.4s ease-in-out infinite alternate; }
+@keyframes step { from { transform: rotate(16deg); } to { transform: rotate(-16deg); } }
+@keyframes tailsway { from { transform: rotate(-6deg); } to { transform: rotate(8deg); } }
+
+/* Awards: the black cat sits on top of the Highest flyer card, blinking, swishing its tail and now and then licking a paw. */
+.awards { margin-top: 44px; }
+body.spooky .awards { margin-top: 100px; }
+
+/* Christmas Special: festive red accent, a pine-dark night sky, gentle snowfall over everything, and a tree scene on welcome. */
+body.xmas { --amber: #ff5a5f; background: radial-gradient(120% 70% at 50% 0%, #11383a 0%, #102131 45%, var(--bg) 75%) fixed, var(--bg); }
+body.xmas .hero { text-shadow: 0 4px 0 #6e1a20; }
+#snowLayer { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 4; display: none; }
+body.xmas #snowLayer { display: block; }
+#snowLayer i { position: absolute; top: -12px; width: var(--s); height: var(--s); border-radius: 50%; background: #fff; opacity: var(--o); animation: snowfall var(--d) linear var(--delay) infinite; }
+@keyframes snowfall { to { transform: translate(var(--drift), 105vh); } }
+.scene .twinkle { animation: twinkle 1.8s ease-in-out infinite; }
+.scene .twinkle:nth-of-type(2n) { animation-delay: -.6s; }
+.scene .twinkle:nth-of-type(3n) { animation-delay: -1.2s; }
+@keyframes twinkle { 50% { opacity: .35; } }
+.runner .leg { transform-box: fill-box; transform-origin: 50% 0; animation: run .26s ease-in-out infinite alternate; }
+.runner .leg.b { animation-delay: -.26s; }
+@keyframes run { from { transform: rotate(28deg); } to { transform: rotate(-28deg); } }
+@media (prefers-reduced-motion: reduce) { #snowLayer { display: none !important; } }
+.award.perch { position: relative; }
+.cat-sit { position: absolute; right: 6px; top: -104px; width: 96px; pointer-events: none; }
+.cat-sit svg { display: block; width: 100%; height: auto; overflow: visible; }
+.cat-sit .eyes { transform-box: fill-box; transform-origin: center; animation: blink 5s infinite; }
+.cat-sit .tail { transform-box: fill-box; transform-origin: 0% 100%; animation: tailsway 2.4s ease-in-out infinite alternate; }
+/* Lick: the standing front leg swaps for a bent foreleg curled up to the mouth (toe beans facing the tongue);
+   the paw bobs against the tongue a few times, the head tips into it, then the leg goes back down. */
+.cat-sit .paw { animation: restpaw 6s ease-in-out infinite; }
+.cat-sit .raised { opacity: 0; animation: raisepaw 6s ease-in-out infinite; }
+.cat-sit .lickpaw { animation: lickbob 6s ease-in-out infinite; }
+.cat-sit .tongue { opacity: 0; animation: tongue 6s ease-in-out infinite; }
+.cat-sit .head { transform-box: fill-box; transform-origin: 50% 90%; animation: nod 6s ease-in-out infinite; }
+@keyframes blink { 0%, 46%, 50%, 100% { transform: scaleY(1); } 48% { transform: scaleY(.1); } }
+@keyframes restpaw { 0%, 54%, 94%, 100% { opacity: 1; } 58%, 90% { opacity: 0; } }
+@keyframes raisepaw { 0%, 54%, 94%, 100% { opacity: 0; } 58%, 90% { opacity: 1; } }
+@keyframes lickbob {
+  0%, 60%, 70%, 80%, 90%, 100% { transform: translate(0, 0); }
+  65%, 75%, 85% { transform: translate(-1px, -1.6px); }
+}
+@keyframes tongue { 0%, 62%, 88%, 100% { opacity: 0; } 65%, 85% { opacity: 1; } }
+@keyframes nod { 0%, 56%, 92%, 100% { transform: rotate(0); } 62%, 86% { transform: rotate(5deg) translateY(1px); } }
+@media (prefers-reduced-motion: reduce) { .cat-sit * { animation: none !important; } }
+.special { display: inline-block; margin-bottom: 10px; font-size: .75rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--card-ink); background: var(--amber); padding: 5px 12px; border-radius: 999px; }
+@keyframes sway { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-4deg); } }
+.fan { cursor: pointer; -webkit-tap-highlight-color: transparent; background: none; padding: 0; border-radius: 24px; display: block; }
+.bubbles { position: absolute; inset: -20px 0 0; pointer-events: none; }
+.bubbles i { position: absolute; bottom: 0; width: 10px; height: 10px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--amber) 70%, transparent); opacity: 0; animation: rise 4s ease-in infinite; }
+.bubbles i:nth-child(1) { left: 12%; animation-delay: 1s; }
+.bubbles i:nth-child(2) { left: 30%; width: 6px; height: 6px; animation-delay: 2.2s; }
+.bubbles i:nth-child(3) { left: 70%; animation-delay: 1.6s; }
+.bubbles i:nth-child(4) { left: 86%; width: 7px; height: 7px; animation-delay: 3s; }
+.bubbles i:nth-child(5) { left: 52%; width: 5px; height: 5px; animation-delay: 3.6s; }
+@keyframes rise { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: .9; } 100% { transform: translateY(-230px) translateX(8px); opacity: 0; } }
+.hero { font-size: clamp(3.2rem, 15vw, 4.8rem); line-height: .92; text-shadow: 0 4px 0 #6b3f12; animation: pop .6s cubic-bezier(.2,.9,.25,1.4) .55s both; }
+@keyframes pop { from { transform: scale(.6) rotate(-4deg); opacity: 0; } }
+.welcome .sub { color: var(--fg); font-family: "Playfair Display", "Times New Roman", Times, serif; font-style: italic; font-weight: 700; font-size: 1.3rem; line-height: 1.3; max-width: 24ch; margin: 0; text-wrap: balance; }
+.welcome .sub em { font-style: italic; font-weight: 800; color: var(--amber); }
+.welcome .cta { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 320px; }
+.welcome .cta .btn { padding: 16px 18px; font-size: 1.1rem; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 420px; counter-reset: s; }
+.steps li { counter-increment: s; background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px; padding: 12px 8px; font-size: .85rem; line-height: 1.3; color: var(--muted); }
+.steps li::before { content: counter(s); display: block; font-family: var(--display); font-size: 1.4rem; color: var(--amber); margin-bottom: 4px; }
+.steps li b { display: block; color: var(--fg); font-size: .92rem; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.badges span { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; }
+@media (prefers-reduced-motion: reduce) { .hero, .bubbles i, .spread, .pc, .scene * { animation: none !important; } .bubbles { display: none; } }
+.foot-note { text-align: center; color: var(--muted); font-size: .8rem; line-height: 1.5; }
+.sync { font-size: .78rem; color: var(--muted); text-align: center; }
+.sync b { color: var(--secret); font-family: var(--mono); letter-spacing: .1em; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--card-ink); font-weight: 800; padding: 10px 16px; border-radius: 999px; box-shadow: 0 8px 20px rgba(0,0,0,.4); pointer-events: none; opacity: 0; transition: opacity .2s; max-width: calc(100vw - 40px); text-align: center; }
+.toast.on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .card.flip, .chip.pick { animation: none; } .chip { transition: none; } }
+</style>
+
+<div class="app" id="app"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="batLayer" aria-hidden="true"></div>
+<div id="snowLayer" aria-hidden="true"></div>
+
+<script>
+// Card kinds: how each one resolves.
+const KINDS = {
+  dare:   { name: "Dare",           c: "--dare" },
+  truth:  { name: "Truth",          c: "--truth" },
+  rule:   { name: "New Rule",       c: "--rule" },
+  all:    { name: "Everybody",      c: "--all" },
+  duel:   { name: "Showdown",       c: "--duel" },
+  gift:   { name: "Hand Out",       c: "--gift" },
+  cat:    { name: "Categories",     c: "--cat" },
+  secret: { name: "Secret Mission", c: "--secret" },
+  water:  { name: "Water Break",    c: "--water" },
+};
+// [kind, level, sips, text, timer seconds]. {p} = whose turn, {o} / {q} = other players
+// (least recently picked first), {lead} = whoever has the most sips. Level 1 chill, 2 rowdy, 3 spicy 18+.
+const DECK = [
+  // dares
+  ["dare",1,2,"Do your best impression of {o}. If the table can't guess who it is, drink."],
+  ["dare",1,2,"Talk in a fake accent until your next turn. Slip up and drink."],
+  ["dare",1,2,"Let {o} pick a song. Sing the chorus out loud."],
+  ["dare",1,2,"Do 10 squats right now, or drink.",30],
+  ["dare",1,2,"Swap one item of clothing (jacket, hat, sock) with {o} for the rest of the round."],
+  ["dare",1,2,"Hold a plank for a full minute. Drop early and drink.",60],
+  ["dare",2,3,"Read the last text you sent out loud, no context allowed."],
+  ["dare",2,3,"Let {o} post one harmless emoji to your story, or drink."],
+  ["dare",2,2,"Give {o} a dramatic toast as if it's their wedding.",30],
+  ["dare",2,3,"Show the table the 5th photo in your camera roll."],
+  ["dare",3,3,"Let {o} send one text from your phone to a contact of their choice (you can veto one person)."],
+  ["dare",3,3,"Call someone not in the room and sing them happy birthday."],
+  ["dare",2,2,"Speak only in questions until your next turn. Every slip is a sip."],
+  ["dare",1,2,"Do a runway walk across the room. {o} narrates.",20],
+  // truths
+  ["truth",1,2,"What's the most embarrassing thing in your search history this month?"],
+  ["truth",1,2,"Who here would you call first to help hide a body?"],
+  ["truth",1,2,"What's a hill you'll die on that nobody else agrees with?"],
+  ["truth",2,2,"What's the worst lie you've told someone at this table?"],
+  ["truth",2,3,"Rate everyone's outfit tonight out of 10. Out loud."],
+  ["truth",2,3,"What's one thing you've never told {o}?"],
+  ["truth",3,3,"Describe your worst date in three words, then defend them."],
+  ["truth",3,3,"Who here would you trust least with your phone unlocked?"],
+  ["truth",1,2,"What's your most useless talent? Prove it."],
+  ["truth",2,2,"What's the pettiest reason you stopped talking to someone?"],
+  // rules
+  ["rule",1,0,"No saying anyone's name. Use nicknames only. Break it and drink."],
+  ["rule",1,0,"Drink with your non-dominant hand only. Wrong hand: drink again."],
+  ["rule",1,0,"{p} is the Question Master. Anyone who answers a question from them drinks."],
+  ["rule",1,0,"Before drinking, you must say \"cheers\" to {o}. Forget and drink twice."],
+  ["rule",1,0,"No pointing. Point at anything and drink."],
+  ["rule",2,0,"Swearing costs a sip."],
+  ["rule",2,0,"Make up any rule you want. {p} has the floor."],
+  ["rule",2,0,"Thumb Master: {p} can put a thumb on the table any time. Last to copy drinks."],
+  ["rule",1,0,"Every time someone laughs at their own joke, they drink."],
+  // everyone
+  ["all",1,1,"Everyone wearing black drinks."],
+  ["all",1,1,"Last person to touch their nose drinks. Go!"],
+  ["all",1,1,"Everyone who has been to another continent drinks."],
+  ["all",1,2,"Never have I ever fallen asleep somewhere embarrassing. If you have, drink."],
+  ["all",1,1,"Never have I ever lied about my age. If you have, drink."],
+  ["all",2,2,"Never have I ever texted an ex after midnight. If you have, drink."],
+  ["all",2,2,"Never have I ever been kicked out of somewhere. If you have, drink."],
+  ["all",1,1,"Whoever's phone has the lowest battery drinks. Check now."],
+  ["all",1,1,"Everyone takes one sip on three. Cheers!"],
+  ["all",2,2,"Most likely to get arrested tonight? Count to three and point. Most votes drinks double."],
+  ["all",1,1,"Last person to raise their glass drinks."],
+  ["all",3,2,"Never have I ever kissed someone in this room. If you have, drink."],
+  ["all",1,1,"Everyone with fewer sips than {lead} drinks 1. Time to catch up."],
+  // duels
+  ["duel",1,2,"Staring contest: {p} vs {o}. First to blink drinks."],
+  ["duel",1,2,"Rock, paper, scissors, best of three: {p} vs {o}."],
+  ["duel",1,2,"Thumb war: {p} vs {o}."],
+  ["duel",1,3,"Name 5 countries starting with the same letter. {p} vs {o}, {o} picks the letter.",30],
+  ["duel",2,2,"Who knows {q} better? {p} vs {o}. {q} asks one question about themselves."],
+  ["duel",1,2,"Hum a song: {p} hums, {o} guesses. Wrong guess and {o} drinks, right guess and {p} does.",20],
+  ["duel",2,3,"Arm wrestle: {p} vs {o}."],
+  ["duel",1,2,"Title fight: {p} challenges {lead}, who has the most sips, to rock, paper, scissors."],
+  // gifts
+  ["gift",1,2,"Hand out 2 sips to anyone you like."],
+  ["gift",1,3,"Hand out 3 sips. Choose wisely."],
+  ["gift",2,4,"Hand out 4 sips. Spread them or stack them."],
+  ["gift",1,1,"Give 1 sip to whoever's laughing the loudest right now."],
+  ["gift",1,2,"Revenge round: {lead} has the most sips, so they get to hand out 2. Pass them the phone."],
+  // categories
+  ["cat",1,1,"Categories: types of cheese. Go around starting with {p}. First to blank or repeat drinks.",5],
+  ["cat",1,1,"Categories: Pixar movies. Start with {p}.",5],
+  ["cat",1,1,"Categories: things you find in a bathroom. Start with {p}.",5],
+  ["cat",1,1,"Categories: cocktails. Start with {p}.",5],
+  ["cat",1,1,"Rhyme time: {p} says a word, go around rhyming. First to fail drinks.",5],
+  ["cat",1,1,"Categories: car brands. Start with {p}.",5],
+  ["cat",2,1,"Categories: excuses for being late. Start with {p}.",5],
+  ["cat",1,1,"Categories: board games. Start with {p}.",5],
+  // secret missions: pull it off and {o} drinks, get caught and {p} does
+  ["secret",1,3,"Get {o} to say \"yes\" three times before your next turn."],
+  ["secret",1,3,"Make {o} touch their face before your next turn without asking them to."],
+  ["secret",1,3,"Get {o} to ask you a question before your next turn."],
+  ["secret",1,3,"Get {o} to stand up before your next turn."],
+  ["secret",1,3,"Slip the word \"pineapple\" into conversation twice without {o} calling it out."],
+  ["secret",2,3,"Get {o} to high-five you before your next turn."],
+  ["secret",2,3,"Get {o} to sing along to something before your next turn."],
+  ["secret",3,3,"Get {o} to compliment how you look before your next turn."],
+  ["secret",3,3,"Wink at {o} three times without anyone else noticing."],
+  // spicy 18+: anything physical needs a yes from both people
+  ["truth",3,3,"What's the boldest place you've ever hooked up?"],
+  ["truth",3,2,"Rate your last kiss out of 10 and explain the score."],
+  ["truth",3,3,"What's a turn-on you'd never put on a dating profile?"],
+  ["truth",3,2,"Who at this table would you most want to be stuck in an elevator with? Why?"],
+  ["truth",3,3,"What's the most embarrassing thing that has happened to you in bed?"],
+  ["truth",3,4,"Say your body count out loud, or drink 4."],
+  ["truth",3,3,"Describe a fantasy you've never told anyone. Keep it table-friendly-ish."],
+  ["truth",3,2,"Based on vibes alone, who here is the best kisser?"],
+  ["truth",3,2,"Describe your type using only people at this table."],
+  ["truth",3,3,"What's the worst thing someone has said to you mid-hookup?"],
+  ["truth",3,3,"Ever had a crush on a friend's partner? Details, please."],
+  ["truth",3,3,"What's the longest you've gone without sex, and how did it end?"],
+  ["dare",3,3,"Give {o} a 10-second lap dance if they're up for it. Otherwise you both drink.",10],
+  ["dare",3,2,"Whisper your best flirty line in {o}'s ear. They rate it out of 10 to the table."],
+  ["dare",3,3,"Show the table your most recent dating-app chat."],
+  ["dare",3,3,"Take off one item of clothing. Accessories don't count."],
+  ["dare",3,2,"Do your most seductive walk across the room. {o} provides the soundtrack.",20],
+  ["dare",3,2,"Kiss {o} on the cheek if they agree. If not, you both drink."],
+  ["dare",3,2,"Body shot from {o}'s hand: salt, sip, lime. Only if they say yes."],
+  ["dare",3,3,"Send a fire emoji to the third person in your DMs. No explanation allowed."],
+  ["dare",3,2,"Demonstrate your signature move on a pillow. The table scores it.",15],
+  ["dare",3,3,"Let {o} write a new dating-app bio for you and read it aloud like it's real."],
+  ["dare",3,3,"Sit on {o}'s lap until your next turn, if they're fine with it."],
+  ["all",3,2,"Never have I ever hooked up with someone whose name I didn't know. If you have, drink."],
+  ["all",3,2,"Never have I ever sent a nude. If you have, drink."],
+  ["all",3,2,"Never have I ever been caught in the act. If you have, drink."],
+  ["all",3,2,"Never have I ever had a one-night stand. If you have, drink."],
+  ["all",3,2,"Never have I ever hooked up in a car. If you have, drink."],
+  ["all",3,2,"Never have I ever faked it. If you have, drink."],
+  ["all",3,2,"Never have I ever slept with someone from work. If you have, drink."],
+  ["all",3,2,"Most likely to have a secret spicy account? Point on three. Most votes drinks."],
+  ["all",3,2,"Never have I ever kissed two people in one night. If you have, drink."],
+  ["duel",3,2,"Pickup-line battle: {p} vs {o}. {q} judges, loser drinks.",30],
+  ["duel",3,2,"Bedroom eyes stare-off: {p} vs {o}. First to laugh drinks."],
+  ["duel",3,2,"Dirty talk in a robot voice: {p} vs {o}. Table votes the winner.",20],
+  ["rule",3,0,"Say \"sex\", \"hot\" or \"naughty\" and you drink."],
+  ["rule",3,0,"{o} and {q} are now drinking partners. When one drinks, so does the other."],
+  ["rule",3,0,"Everyone has to wink at the person they're talking to. Forget and drink."],
+  ["cat",3,1,"Categories: slang for making out. Start with {p}.",5],
+  ["cat",3,1,"Categories: places you shouldn't hook up. Start with {p}.",5],
+  ["cat",3,1,"Categories: songs that set the mood. Start with {p}.",5],
+  // Halloween Special
+  ["rule",1,0,"Vampire rule: nobody may say \"garlic\", \"blood\" or \"bite\". Slip up and drink.",0,"h"],
+  ["dare",1,2,"Talk like a vampire count until your next turn. Every slip is a sip.",0,"h"],
+  ["dare",1,2,"Do your best villain laugh. If the table rates it under 7, drink.",0,"h"],
+  ["gift",1,3,"Bite! Sink your fangs into 3 sips and hand them out.",0,"h"],
+  ["all",1,1,"Everyone not wearing a costume drinks. No excuses.",0,"h"],
+  ["all",1,2,"Never have I ever slept with the lights on after a horror movie. If you have, drink.",0,"h"],
+  ["truth",1,2,"What's the scariest thing that has ever actually happened to you?",0,"h"],
+  ["duel",1,2,"Scream-off: {p} vs {o}. The table picks the most bloodcurdling. Loser drinks.",10,"h"],
+  ["cat",1,1,"Categories: horror movies. Start with {p}.",5,"h"],
+  ["secret",1,3,"Get {o} to say \"boo\" before your next turn.",0,"h"],
+  ["truth",3,3,"Who here would you let bite your neck?",0,"h"],
+  ["dare",3,2,"Give {o} a slow vampire bite on the neck, if they're up for it. If not, you both drink.",0,"h"],
+  // Christmas Special
+  ["rule",1,0,"Christmas rule: say \"Merry Christmas\" before every sip. Forget and drink again.",0,"x"],
+  ["dare",1,2,"Talk like Santa until your next turn. Every sentence starts with \"Ho ho ho\".",0,"x"],
+  ["dare",1,2,"Sing the chorus of a Christmas song of {o}'s choice, or drink.",20,"x"],
+  ["gift",1,3,"Secret Santa: hand out 3 sips however you like.",0,"x"],
+  ["all",1,2,"Never have I ever regifted a present. If you have, drink.",0,"x"],
+  ["all",1,1,"Krampus is coming! Last person to hide under the table drinks.",0,"x"],
+  ["truth",1,2,"What's the worst present you've ever received, and who gave it?",0,"x"],
+  ["duel",1,2,"Naughty or nice: the table votes on who was naughtier this year, {p} or {o}. Naughtiest drinks.",0,"x"],
+  ["cat",1,1,"Categories: Christmas songs. Start with {p}.",5,"x"],
+  ["secret",1,3,"Get {o} to say \"present\" before your next turn.",0,"x"],
+  ["truth",3,3,"Who here would you kiss under the mistletoe?",0,"x"],
+  ["dare",3,2,"Mistletoe! Kiss {o} on the cheek if they're up for it. If not, you both drink.",0,"x"],
+];
+
+const LEVELS = [
+  ["Chill", "Easy dares, simple rules. Good for warming up."],
+  ["Rowdy", "Adds bolder truths, phone dares and bigger hand-outs."],
+  ["Spicy 18+", "Adults only. Sex questions, flirty dares and dirty never-have-I-evers. Anything physical needs a yes from both people, and a no just means you drink."],
+  ["Escalate", "Starts chill, gets rowdy from round 4 and goes Spicy 18+ from round 7."],
+];
+const LENGTHS = [0, 5, 10, 15];
+
+// Drinks set the strength; the glass sets how big a sip is.
+// abv is the strength of the finished drink (with mixer and ice melt), so cocktails sit well below their spirits.
+const DRINKS = {
+  beer:       { group: "Beer & co",         name: "Beer",                   abv: .05,  glass: "bottle" },
+  cider:      { group: "Beer & co",         name: "Cider",                  abv: .045, glass: "bottle" },
+  seltzer:    { group: "Beer & co",         name: "Hard seltzer",           abv: .05,  glass: "bottle" },
+  wine:       { group: "Wine & spritz",     name: "Wine",                   abv: .12,  glass: "wine" },
+  prosecco:   { group: "Wine & spritz",     name: "Prosecco / sparkling",   abv: .11,  glass: "wine" },
+  spritz:     { group: "Wine & spritz",     name: "Aperol / Hugo spritz",   abv: .08,  glass: "copa" },
+  gintonic:   { group: "Long drinks",       name: "Gin & tonic",            abv: .10,  glass: "copa" },
+  vodkamix:   { group: "Long drinks",       name: "Vodka + mixer",          abv: .10,  glass: "tall" },
+  rumcoke:    { group: "Long drinks",       name: "Rum & coke / Cuba libre", abv: .10, glass: "tall" },
+  whiskeycoke:{ group: "Long drinks",       name: "Whiskey & coke",         abv: .10,  glass: "tall" },
+  mule:       { group: "Long drinks",       name: "Moscow mule",            abv: .10,  glass: "rocks" },
+  mojito:     { group: "Long drinks",       name: "Mojito",                 abv: .10,  glass: "tall" },
+  sotb:       { group: "Long drinks",       name: "Sex on the beach",       abv: .10,  glass: "tall" },
+  sunrise:    { group: "Long drinks",       name: "Tequila sunrise",        abv: .10,  glass: "tall" },
+  longisland: { group: "Long drinks",       name: "Long Island iced tea",   abv: .20,  glass: "tall" },
+  longdrink:  { group: "Long drinks",       name: "Other long drink",       abv: .10,  glass: "tall" },
+  pinacolada: { group: "Cocktails",         name: "Piña colada",            abv: .09,  glass: "hurricane" },
+  caipirinha: { group: "Cocktails",         name: "Caipirinha",             abv: .18,  glass: "rocks" },
+  margarita:  { group: "Cocktails",         name: "Margarita",              abv: .20,  glass: "martini" },
+  daiquiri:   { group: "Cocktails",         name: "Daiquiri",               abv: .20,  glass: "martini" },
+  espresso:   { group: "Cocktails",         name: "Espresso martini",       abv: .18,  glass: "martini" },
+  pornstar:   { group: "Cocktails",         name: "Pornstar martini",       abv: .16,  glass: "martini" },
+  cosmo:      { group: "Cocktails",         name: "Cosmopolitan",           abv: .20,  glass: "martini" },
+  whiskeysour:{ group: "Cocktails",         name: "Whiskey / amaretto sour", abv: .15, glass: "rocks" },
+  maitai:     { group: "Cocktails",         name: "Mai tai",                abv: .18,  glass: "rocks" },
+  negroni:    { group: "Cocktails",         name: "Negroni",                abv: .24,  glass: "rocks" },
+  cocktail:   { group: "Cocktails",         name: "Other cocktail",         abv: .15,  glass: "cocktail" },
+  shot:       { group: "Shots",             name: "Shots",                  abv: .40,  glass: "shot" },
+  none:       { group: "No alcohol",        name: "Water / 0.0",            abv: 0,    glass: "tall" },
+};
+const GLASSES = {
+  shot:      { name: "Shot glass 4 cl",       ml: 40,  sip: 20 },
+  martini:   { name: "Martini / coupe 0.15 L", ml: 150, sip: 20 },
+  wine:      { name: "Wine glass 0.15 L",     ml: 150, sip: 20 },
+  cocktail:  { name: "Cocktail 0.2 L",        ml: 200, sip: 25 },
+  rocks:     { name: "Tumbler / mug 0.25 L",  ml: 250, sip: 25 },
+  tall:      { name: "Highball 0.3 L",        ml: 300, sip: 30 },
+  bottle:    { name: "Bottle 0.33 L",         ml: 330, sip: 30 },
+  hurricane: { name: "Hurricane 0.4 L",       ml: 400, sip: 30 },
+  copa:      { name: "Copa / balloon 0.5 L",  ml: 500, sip: 35 },
+  pint:      { name: "Pint 0.5 L",            ml: 500, sip: 35 },
+};
+// Widmark distribution factor by body type, and elimination per hour in ‰.
+const BODY = { m: { name: "Male body", r: .68 }, f: { name: "Female body", r: .55 }, x: { name: "Average", r: .62 } };
+const BURN = .15;
+const WATER_AT = 1.0;
+const TIERS = [
+  [.05, "Sober as a judge"], [.3, "Warmed up"], [.5, "Giggly"], [.8, "Karaoke ready"],
+  [1.2, "Table philosopher"], [1.6, "Hugs everyone"], [2.2, "Texting the ex"], [Infinity, "Time for water and bed"],
+];
+const glassOf = p => GLASSES[p.glass] || GLASSES[(DRINKS[p.drink] || DRINKS.beer).glass];
+function promille(p) {
+  const d = DRINKS[p.drink] || DRINKS.beer;
+  const grams = p.sips * glassOf(p).sip * d.abv * 0.789;
+  const r = (BODY[p.body] || BODY.x).r;
+  const hours = p.first ? (Date.now() - p.first) / 3.6e6 : 0;
+  return Math.max(0, grams / ((+p.kg || 70) * r) - BURN * hours);
+}
+const glasses = p => p.sips * glassOf(p).sip / glassOf(p).ml;
+const tier = v => TIERS.find(t => v < t[0])[1];
+const fmt = v => v.toFixed(2) + "‰";
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const TAB = Math.random().toString(36).slice(2);
+
+// S is the shared game (synced across phones). L is this phone only.
+let S;
+const L = { screen: "welcome", code: "", me: -1, peek: {}, reveal: false, timerEnd: 0, timerFor: "", sync: "" };
+
+// Themes switch themselves on in season (Halloween 15 Oct to 2 Nov, Christmas 1 to 26 Dec); players can pick any in Setup.
+const THEMES = {
+  classic:   { label: "Classic", name: "Classic", decides: "the deck decides.", hint: "The everyday look and deck." },
+  halloween: { label: "Halloween", name: "Halloween Special", decides: "the Count decides.",
+               hint: "Pumpkin colours, the Count on the welcome screen, bats, a witch and a black cat, plus extra spooky cards." },
+  christmas: { label: "Christmas", name: "Christmas Special", decides: "Santa decides.",
+               hint: "Festive red, falling snow, a tree full of lights, Santa and Krampus chasing each other, plus extra Christmas cards." },
+};
+function seasonTheme(d = new Date()) {
+  if ((d.getMonth() === 9 && d.getDate() >= 15) || (d.getMonth() === 10 && d.getDate() <= 2)) return "halloween";
+  if (d.getMonth() === 11 && d.getDate() <= 26) return "christmas";
+  return "classic";
+}
+function fresh(saved) {
+  const s = Object.assign({
+    players: [
+      { name: "Maya", drink: "wine", kg: 62, body: "f" }, { name: "Jonah", drink: "beer", kg: 82, body: "m" },
+      { name: "Priya", drink: "spritz", kg: 58, body: "f" }, { name: "Theo", drink: "shot", kg: 75, body: "m" },
+    ],
+    level: 2, length: 0, turn: 0, tick: 0, deck: [], deckLevel: 0, card: null, rules: [], missions: [],
+    gift: 0, round: 1, picked: [], votes: {}, over: false, history: [], refills: [], penalty: -1,
+  }, saved);
+  s.players = s.players.map(newPlayer);
+  // Older saves only had a Halloween on/off switch.
+  if (!THEMES[s.theme]) s.theme = s.spooky === true ? "halloween" : s.spooky === false ? "classic" : seasonTheme();
+  delete s.spooky;
+  return s;
+}
+function newPlayer(p) {
+  const n = Object.assign({ sips: 0, drink: "beer", kg: 70, body: "x", first: 0, peak: 0, refused: 0, done: 0, made: 0, won: 0, water: 0, lastPicked: 0, sinceRefill: 0, nursed: 0 }, p);
+  if (!GLASSES[n.glass]) n.glass = (DRINKS[n.drink] || DRINKS.beer).glass;
+  return n;
+}
+
+function save() {
+  try { localStorage.setItem("pd-state", JSON.stringify(S)); localStorage.setItem("pd-local", JSON.stringify({ code: L.code, me: L.me })); } catch {}
+}
+function load() { try { return JSON.parse(localStorage.getItem("pd-state")) || {}; } catch { return {}; } }
+function loadLocal() { try { return JSON.parse(localStorage.getItem("pd-local")) || {}; } catch { return {}; } }
+
+// Every change to the game goes through here so it can be undone and synced.
+function mutate(fn, record = true) {
+  const before = record ? JSON.stringify(Object.assign({}, S, { history: [] })) : null;
+  fn();
+  if (record) { S.history.push(before); if (S.history.length > 10) S.history.shift(); }
+  render();
+  push();
+}
+function undo() {
+  const prev = S.history.pop();
+  if (!prev) return toast("Nothing to undo");
+  const history = S.history;
+  S = fresh(JSON.parse(prev));
+  S.history = history;
+  L.reveal = false;
+  toast("Undone");
+  render();
+  push();
+}
+
+const effLevel = () => S.level === 4 ? (S.round <= 3 ? 1 : S.round <= 6 ? 2 : 3) : S.level;
+// Spicy leaves out the chill cards so the 18+ ones come up often. Halloween cards ("h") only join the Halloween Special.
+const inLevel = (c, lv = effLevel()) => (c[5] !== "h" || S.theme === "halloween") && (c[5] !== "x" || S.theme === "christmas") && (lv === 3 ? c[1] >= 2 : c[1] <= lv);
+function buildDeck() { S.deckLevel = effLevel(); S.deck = shuffle(DECK.map((c, i) => i).filter(i => inLevel(DECK[i]))); }
+
+// Pick the other players who were picked least recently, so nobody gets hit every turn.
+function others(n) {
+  const pool = shuffle(S.players.map((_, i) => i).filter(i => i !== S.turn));
+  pool.sort((a, b) => S.players[a].lastPicked - S.players[b].lastPicked);
+  const out = pool.slice(0, n);
+  out.forEach(i => S.players[i].lastPicked = S.tick);
+  return out;
+}
+function leader() {
+  const max = Math.max(...S.players.map(p => p.sips));
+  return shuffle(S.players.map((_, i) => i).filter(i => S.players[i].sips === max))[0];
+}
+
+function draw() {
+  mutate(() => {
+    S.tick++;
+    const me = S.players[S.turn];
+    if (promille(me) >= WATER_AT && Math.random() < .35) {
+      S.card = { kind: "water", sips: 0, text: "Water break, {p}. Your estimate just passed 1‰. Finish a glass of water before your next turn, then you're back in.", p: S.turn, o: S.turn, q: S.turn, lead: S.turn, timer: 0 };
+      return;
+    }
+    if (!S.deck.length || S.deckLevel !== effLevel()) buildDeck();
+    const [kind, , sips, text, timer] = DECK[S.deck.pop()];
+    const [o, q] = others(2);
+    const lead = leader();
+    const c = { kind, sips, text, p: S.turn, o: o ?? S.turn, q: q ?? o ?? S.turn, lead, timer: timer || 0 };
+    if (kind === "duel" && text.includes("{lead}")) c.o = lead !== S.turn ? lead : c.o;
+    S.card = c;
+    S.picked = []; S.votes = {};
+    if (kind === "gift") S.gift = sips;
+  });
+  L.reveal = false; L.timerEnd = 0;
+  flipNext = true;
+  render();
+}
+
+function fill(c, text = c.text) {
+  const name = i => `<em>${esc(S.players[i].name)}</em>`;
+  return esc(text).replace(/\{p\}/g, name(c.p)).replace(/\{o\}/g, name(c.o)).replace(/\{q\}/g, name(c.q)).replace(/\{lead\}/g, name(c.lead));
+}
+
+function sip(i, n) {
+  const p = S.players[i];
+  if (!p.first) p.first = Date.now();
+  p.sips += n;
+  p.peak = Math.max(p.peak, promille(p));
+  // Refill check: once the counted sips add up to a full glass, ask whether it's really empty.
+  p.sinceRefill = (p.sinceRefill || 0) + n;
+  S.refills = S.refills || [];
+  if (p.sinceRefill >= glassSips(p) && !S.refills.includes(i)) S.refills.push(i);
+}
+// How many sips the game counts as one full glass for this player (a pint is about 14, a martini glass about 8).
+const glassSips = p => Math.max(1, Math.round(glassOf(p).ml / glassOf(p).sip));
+function addSips(i, n) {
+  sip(i, n);
+  toast(`${S.players[i].name} +${n} sip${n > 1 ? "s" : ""}`);
+  bump(i);
+}
+function bump(i) {
+  requestAnimationFrame(() => {
+    const el = document.querySelector(`.chip[data-i="${i}"]`);
+    if (el) { el.classList.add("bump"); setTimeout(() => el.classList.remove("bump"), 180); }
+  });
+}
+
+// Called inside mutate().
+function next() {
+  S.card = null; S.gift = 0; S.picked = []; S.votes = {};
+  S.turn = (S.turn + 1) % S.players.length;
+  if (S.turn === 0) {
+    S.round++;
+    if (S.length && S.round > S.length) S.over = true;
+  }
+  L.reveal = false; L.timerEnd = 0;
+}
+
+let toastT;
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("on");
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 1800);
+}
+
+let flipNext = false;
+function render() {
+  save();
+  const flip = flipNext; flipNext = false;
+  const screen = S.over && L.screen === "game" ? "awards" : L.screen;
+  document.body.classList.toggle("spooky", S.theme === "halloween");
+  document.body.classList.toggle("xmas", S.theme === "christmas");
+  if (screen === "awards") $("#batLayer")?.replaceChildren();
+  $("#app").innerHTML = screen === "welcome" ? welcomeView() : screen === "setup" ? setupView() : screen === "awards" ? awardsView() : gameView(flip);  tickTimer();
+}
+
+// Intro spread, back to front: [kind, corner letter, symbol, name, rotation, x, y,
+//   fly-in start (x, y, spin), where it first lands before settling (x, y, tilt offsets)].
+const SPREAD = [
+  // Starts are past the screen edge plus a card's reach (~150px), so every card begins out of sight.
+  ["duel",   "S", "×", "Showdown", -62, -22, 10, "calc(-50vw - 170px)", "calc(-20vh - 200px)", -320,  38, -30,  28],
+  ["truth",  "T", "?", "Truth",    -40, -16, -2, "calc(50vw + 170px)",  "calc(-20vh - 200px)",  300, -46,  24, -30],
+  ["secret", "M", "✦", "Mission",  -18, -6,  -8, "calc(-50vw - 180px)", "30vh",               -240,  30,  36,  34],
+  ["all",    "E", "∞", "Everybody",  0,  4,  -6, "calc(50vw + 180px)",  "35vh",                260, -34, -26, -26],
+  ["dare",   "D", "!", "Dare",      16, 14,   4, "8vw",                 "calc(-40vh - 260px)",  380,  -8,  16, -22],
+];
+
+// Original cartoon vampire ("the Count") for the Halloween Special: gothic window, moon, bats, candles, a red drink and a table the cards land on.
+const VAMPIRE = `<svg class="scene" viewBox="0 0 340 260" aria-hidden="true">
+  <defs>
+    <radialGradient id="moonGlow"><stop offset="0" stop-color="#dfe8ff" stop-opacity=".55"/><stop offset="1" stop-color="#dfe8ff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="candleGlow"><stop offset="0" stop-color="#ffb347" stop-opacity=".55"/><stop offset="1" stop-color="#ffb347" stop-opacity="0"/></radialGradient>
+  </defs>
+  <path d="M112 196 V72 A58 58 0 0 1 228 72 V196 Z" fill="#1a2350" stroke="#3b2f52" stroke-width="6"/>
+  <circle cx="200" cy="56" r="34" fill="url(#moonGlow)"/>
+  <circle cx="200" cy="56" r="17" fill="#eef2ff"/>
+  <path d="M170 18 V196 M112 120 H228" stroke="#3b2f52" stroke-width="3" fill="none"/>
+  <g class="bats" fill="#0c0a14">
+    <path class="bat" d="M140 66 q5 -7 10 -1 q2 -4 4 0 q5 -6 10 1 q-6 0 -8 5 q-3 -3 -4 0 q-2 -5 -8 -5 z"/>
+    <path class="bat" d="M190 92 q4 -5 7 -1 q1 -3 3 0 q4 -4 7 1 q-4 0 -6 4 q-2 -2 -3 0 q-1 -4 -5 -4 z" style="animation-delay:-.25s"/>
+  </g>
+  <path d="M60 260 Q66 170 170 158 Q274 170 280 260 Z" fill="#15101c"/>
+  <path d="M128 164 L76 96 L112 190 Z" fill="#c42235"/><path d="M126 166 L90 112 L114 184 Z" fill="#6e1020"/>
+  <path d="M212 164 L264 96 L228 190 Z" fill="#c42235"/><path d="M214 166 L250 112 L226 184 Z" fill="#6e1020"/>
+  <path d="M148 164 L170 214 L192 164 Z" fill="#f2ede6"/>
+  <path d="M164 180 L170 172 L176 180 L170 188 Z" fill="#c42235"/>
+  <rect x="157" y="136" width="26" height="30" fill="#aebbe0"/>
+  <path d="M134 106 L123 88 L138 118 Z" fill="#cdd5ec"/><path d="M206 106 L217 88 L202 118 Z" fill="#cdd5ec"/>
+  <path d="M133 98 Q133 140 170 156 Q207 140 207 98 Q205 62 170 60 Q135 62 133 98 Z" fill="#dde3f4"/>
+  <path d="M140 118 Q147 134 160 140 M200 118 Q193 134 180 140" stroke="#bcc5e0" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/>
+  <path d="M127 100 Q120 50 170 45 Q222 47 213 100 Q209 80 196 71 Q186 65 176 72 L170 86 L164 72 Q151 65 141 72 Q131 80 127 100 Z" fill="#110d16"/>
+  <path d="M146 55 Q168 48 198 58" stroke="#3b3448" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+  <path d="M142 96 Q151 91 160 95 M180 95 Q189 91 198 96" stroke="#1a1420" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M144 106 Q152 100 160 106 Q152 111 144 106 Z M180 106 Q188 100 196 106 Q188 111 180 106 Z" fill="#fff"/>
+  <circle cx="153" cy="106" r="3.3" fill="#8a1b2b"/><circle cx="189" cy="106" r="3.3" fill="#8a1b2b"/>
+  <circle cx="154" cy="105" r="1" fill="#fff"/><circle cx="190" cy="105" r="1" fill="#fff"/>
+  <path d="M143 105 Q152 98 161 105 M179 105 Q188 98 197 105" stroke="#1a1420" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M170 108 L167 124 Q170 127 174 124" stroke="#a9b2d1" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M156 135 Q170 144 186 133" stroke="#5a1a28" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <path d="M162 141 Q170 144.5 178 141" stroke="#c98a96" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+  <path d="M161 138.5 l2 5 l2.2 -4.4 Z M175.5 138 l2.2 5 l2 -5.4 Z" fill="#fff"/>
+  <path d="M96 260 Q78 214 78 186 L102 182 Q106 220 126 260 Z" fill="#211a2c"/>
+  <path d="M66 170 q-4 20 12 26 h16 q8 -8 2 -26 Z" fill="#c9d4f2"/>
+  <path d="M70 112 L104 112 L95 158 L79 158 Z" fill="#c8d8ff" fill-opacity=".18" stroke="#d8e4ff" stroke-width="2"/>
+  <path d="M73 124 L101 124 L95 156 L79 156 Z" fill="#d11f30"/>
+  <path d="M93 122 L110 88" stroke="#f4f0ea" stroke-width="3" stroke-linecap="round"/>
+  <path d="M74 120 q-6 -10 2 -16 q4 8 -2 16 Z" fill="#3fae5a"/>
+  <rect x="84" y="158" width="5" height="16" fill="#d8e4ff"/>
+  <ellipse cx="86.5" cy="175" rx="12" ry="3.5" fill="#d8e4ff"/>
+  <ellipse cx="170" cy="252" rx="168" ry="26" fill="#4a2e1e"/>
+  <ellipse cx="170" cy="246" rx="164" ry="22" fill="#6b4329"/>
+  <circle class="glow" cx="38" cy="180" r="34" fill="url(#candleGlow)"/>
+  <circle class="glow" cx="302" cy="176" r="34" fill="url(#candleGlow)" style="animation-delay:-1s"/>
+  <rect x="31" y="190" width="14" height="38" rx="3" fill="#f3e7c6"/><path d="M28 228 h20 l3 10 h-26 Z" fill="#b8892f"/>
+  <path class="flame" d="M38 170 q-7 11 0 19 q7 -8 0 -19 Z" fill="#ffb347"/>
+  <rect x="295" y="186" width="14" height="40" rx="3" fill="#f3e7c6"/><path d="M292 226 h20 l3 10 h-26 Z" fill="#b8892f"/>
+  <path class="flame b" d="M302 166 q-7 11 0 19 q7 -8 0 -19 Z" fill="#ffb347"/>
+</svg>`;
+
+// Christmas welcome scene: snowy window with a moon, a garland of lights, a decorated tree, presents, and the table the cards land on.
+const XMAS_SCENE = `<svg class="scene" viewBox="0 0 340 260" aria-hidden="true">
+  <path d="M150 196 V80 A50 50 0 0 1 250 80 V196 Z" fill="#14294a" stroke="#2c3b4f" stroke-width="6"/>
+  <circle cx="222" cy="66" r="13" fill="#eef2ff"/>
+  <path d="M153 196 V172 Q178 160 200 170 Q224 158 247 168 V196 Z" fill="#e9eef8"/>
+  <g fill="#fff"><circle cx="170" cy="96" r="1.6"/><circle cx="190" cy="120" r="1.3"/><circle cx="235" cy="104" r="1.5"/><circle cx="178" cy="146" r="1.2"/><circle cx="214" cy="136" r="1.6"/><circle cx="240" cy="148" r="1.2"/><circle cx="200" cy="86" r="1.2"/></g>
+  <path d="M200 30 V196 M150 128 H250" stroke="#2c3b4f" stroke-width="3" fill="none"/>
+  <path d="M0 20 Q42 44 85 22 Q128 44 170 22 Q212 44 255 22 Q298 44 340 20" stroke="#1f6b3a" stroke-width="7" fill="none" stroke-linecap="round"/>
+  <g><circle class="twinkle" cx="22" cy="31" r="3.4" fill="#ff5a5f"/><circle class="twinkle" cx="62" cy="33" r="3.4" fill="#ffd166"/><circle class="twinkle" cx="106" cy="33" r="3.4" fill="#5cc8ff"/><circle class="twinkle" cx="148" cy="31" r="3.4" fill="#4fd6a3"/><circle class="twinkle" cx="192" cy="31" r="3.4" fill="#ff5a5f"/><circle class="twinkle" cx="234" cy="33" r="3.4" fill="#ffd166"/><circle class="twinkle" cx="276" cy="33" r="3.4" fill="#5cc8ff"/><circle class="twinkle" cx="318" cy="31" r="3.4" fill="#4fd6a3"/></g>
+  <rect x="66" y="196" width="14" height="22" fill="#6b4329"/>
+  <path d="M73 52 L42 112 H104 Z" fill="#1d6a3a"/><path d="M73 84 L32 156 H114 Z" fill="#20783f"/><path d="M73 118 L22 204 H124 Z" fill="#238546"/>
+  <path d="M50 100 Q73 112 96 98 M42 146 Q73 160 104 144 M32 190 Q73 206 114 188" stroke="#ffd166" stroke-width="2" fill="none" opacity=".8"/>
+  <g><circle class="twinkle" cx="62" cy="96" r="3.2" fill="#ff5a5f"/><circle class="twinkle" cx="86" cy="104" r="3.2" fill="#5cc8ff"/><circle class="twinkle" cx="52" cy="140" r="3.2" fill="#ffd166"/><circle class="twinkle" cx="78" cy="152" r="3.2" fill="#ff5a5f"/><circle class="twinkle" cx="98" cy="140" r="3.2" fill="#4fd6a3"/><circle class="twinkle" cx="44" cy="184" r="3.2" fill="#5cc8ff"/><circle class="twinkle" cx="70" cy="196" r="3.2" fill="#ffd166"/><circle class="twinkle" cx="102" cy="186" r="3.2" fill="#ff5a5f"/></g>
+  <path d="M73 38 l3.6 8 l8.6 .8 l-6.5 5.7 l2 8.4 l-7.7 -4.5 l-7.7 4.5 l2 -8.4 l-6.5 -5.7 l8.6 -.8 Z" fill="#ffd166"/>
+  <rect x="262" y="176" width="40" height="40" rx="3" fill="#c42235"/><rect x="279" y="176" width="6" height="40" fill="#ffd166"/><rect x="262" y="193" width="40" height="6" fill="#ffd166"/>
+  <path d="M282 176 q-10 -12 -14 -2 q6 4 14 2 q10 -12 14 -2 q-6 4 -14 2 Z" fill="#ffd166"/>
+  <rect x="296" y="196" width="30" height="24" rx="3" fill="#1f7a45"/><rect x="308" y="196" width="5" height="24" fill="#ff5a5f"/>
+  <rect x="232" y="200" width="28" height="20" rx="3" fill="#2f6fb3"/><rect x="244" y="200" width="5" height="20" fill="#f4f0ea"/>
+  <ellipse cx="170" cy="252" rx="168" ry="26" fill="#4a2e1e"/>
+  <ellipse cx="170" cy="246" rx="164" ry="22" fill="#6b4329"/>
+</svg>`;
+
+function welcomeView() {
+  const started = S.round > 1 || S.players.some(p => p.sips);
+  return `<main class="welcome">
+    <button type="button" class="fan${S.theme !== "classic" ? " scened" : ""}" id="fan" aria-label="Throw the cards in again">
+      ${S.theme === "halloween" ? VAMPIRE : S.theme === "christmas" ? XMAS_SCENE : ""}
+      <div class="bubbles"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="spread-wrap"><div class="spread">${SPREAD.map(([kind, letter, pip, name, r, x, y, fx, fy, fr, ox, oy, or], i) =>
+        `<div class="pc" style="--c:var(${KINDS[kind].c});--r:${r}deg;--x:${x}px;--y:${y}px;--fx:${fx};--fy:${fy};--fr:${fr}deg;--ox:${ox}px;--oy:${oy}px;--or:${or}deg;animation-delay:${.2 + i * .14}s"><div class="corner"><b>${letter}</b><i>${pip}</i></div><span class="pip">${pip}</span><span class="name">${name}</span></div>`).join("")}</div></div>
+    </button>
+    <div>${S.theme !== "classic" ? `<span class="special">${THEMES[S.theme].name}</span>` : ""}<h1 class="hero">Pour<br>Decisions</h1></div>
+    <p class="sub">Good decisions make boring stories. Tonight, <em>${THEMES[S.theme].decides}</em></p>
+    <div class="cta">
+      ${started ? `<button class="btn" id="continue">Continue the night</button><button class="btn ghost" id="play">Set up players</button>`
+                : `<button class="btn" id="play">Let's play</button>`}
+    </div>
+    <ol class="steps">
+      <li><b>Gather</b>2 to 12 friends</li>
+      <li><b>Draw</b>a card each turn</li>
+      <li><b>Decide</b>do it or drink</li>
+    </ol>
+    <div class="badges"><span>18+</span><span>${window.claude ? "One phone or many" : "Pass the phone"}</span><span>Water counts</span></div>
+  </main>`;
+}
+
+function setupView() {
+  const ok = S.players.length >= 2;
+  const started = S.round > 1 || S.players.some(p => p.sips);
+  return `
+  <header>
+    <div class="top"><h1>Pour Decisions</h1><button class="btn ghost small" id="home">Welcome</button></div>
+    <p class="tag">A party card game for 2 to 12 players. Draw a card on your turn, do what it says, and the app keeps count of every sip.${window.claude ? " Play on one phone or on everyone's." : " Pass one phone around the table."}</p>
+  </header>
+  <section class="panel" aria-labelledby="pl">
+    <div class="label" id="pl">Players · ${S.players.length}</div>
+    <form class="add-row" id="addForm">
+      <input id="newName" type="text" placeholder="Add a name" maxlength="20" autocomplete="off" aria-label="Player name">
+      <button class="btn" type="submit">Add</button>
+    </form>
+    <ul class="roster">
+      ${S.players.map((p, i) => `<li class="prow">
+        <span class="pn">${esc(p.name)}</span>
+        <button type="button" class="x" data-del="${i}" aria-label="Remove ${esc(p.name)}">×</button>
+        <div class="opts">
+          <select id="drink-${i}" data-set="drink" data-i="${i}" aria-label="${esc(p.name)}'s drink">
+            ${[...new Set(Object.values(DRINKS).map(d => d.group))].map(g => `<optgroup label="${g}">${Object.entries(DRINKS).filter(([, d]) => d.group === g).map(([k, d]) => `<option value="${k}"${p.drink === k ? " selected" : ""}>${esc(d.name)}</option>`).join("")}</optgroup>`).join("")}
+          </select>
+          <select id="glass-${i}" data-set="glass" data-i="${i}" aria-label="${esc(p.name)}'s glass">
+            ${Object.entries(GLASSES).map(([k, g]) => `<option value="${k}"${p.glass === k ? " selected" : ""}>${g.name}</option>`).join("")}
+          </select>
+          <input id="kg-${i}" data-set="kg" data-i="${i}" type="number" inputmode="numeric" min="35" max="200" value="${esc(p.kg)}" aria-label="${esc(p.name)}'s weight in kg">
+          <select id="body-${i}" data-set="body" data-i="${i}" aria-label="${esc(p.name)}'s body type">
+            ${Object.entries(BODY).map(([k, b]) => `<option value="${k}"${p.body === k ? " selected" : ""}>${b.name}</option>`).join("")}
+          </select>
+        </div>
+      </li>`).join("")}
+    </ul>
+    <p class="hint">${S.players.length ? "Drink, glass, weight in kg and body type feed the promille estimate. The glass sets how big a sip is and when it's refill time: if your glass isn't empty by then, you finish it." : "Add at least two players to start."}</p>
+  </section>
+  <section class="panel" aria-labelledby="lv">
+    <div class="label" id="lv">Intensity</div>
+    <div class="seg">
+      ${LEVELS.map((l, i) => `<button type="button" data-lvl="${i + 1}" aria-pressed="${S.level === i + 1}">${l[0]}</button>`).join("")}
+    </div>
+    <p class="hint">${LEVELS[S.level - 1][1]}</p>
+  </section>
+  <section class="panel" aria-labelledby="th">
+    <div class="label" id="th">Theme</div>
+    <div class="seg">
+      ${Object.entries(THEMES).map(([k, t]) => `<button type="button" data-theme="${k}" aria-pressed="${S.theme === k}">${t.label}</button>`).join("")}
+    </div>
+    <p class="hint">${THEMES[S.theme].hint}</p>
+  </section>
+  <section class="panel" aria-labelledby="ln">
+    <div class="label" id="ln">Game length</div>
+    <div class="seg">
+      ${LENGTHS.map(n => `<button type="button" data-len="${n}" aria-pressed="${S.length === n}">${n ? n + " rounds" : "Endless"}</button>`).join("")}
+    </div>
+    <p class="hint">When the last round ends, everyone gets the end-of-night awards. You can also end the night any time.</p>
+  </section>
+  ${tableView()}
+  <section class="panel" aria-labelledby="ck">
+    <div class="label" id="ck">The deck · ${DECK.filter(c => inLevel(c, S.level === 4 ? 1 : S.level)).length} cards${S.level === 4 ? " to start" : ""}</div>
+    <div class="legend">
+      ${Object.values(KINDS).map(k => `<span style="--c:var(${k.c})">${k.name}</span>`).join("")}
+    </div>
+    <p class="hint">Refuse a dare or truth and you drink the number on the card. Secret missions stay hidden until they're pulled off or busted. Tap any player's name during the game to add a sip, and use Undo if you tap the wrong one.</p>
+  </section>
+  <div class="row">
+    <button class="btn" id="start" style="flex:1" ${ok ? "" : "disabled"}>${started ? "Resume game" : "Start game"}</button>
+    ${started ? `<button class="btn ghost" id="reset">New game</button>` : ""}
+  </div>
+  <p class="foot-note">Sips can be water. Know your limit, drink water between rounds, and never drive after playing.</p>`;
+}
+
+function tableView() {
+  if (L.code) {
+    return `<section class="panel" aria-labelledby="tb">
+      <div class="label" id="tb">Playing on several phones</div>
+      <div class="row"><span class="table-code">${esc(L.code)}</span><span class="hint" style="flex:1">${L.sync === "live" ? "Live. Every change shows on all phones at this table." : "Connecting…"}</span></div>
+      <label class="hint" for="meSel">Who's holding this phone?</label>
+      <select id="meSel" class="field">
+        <option value="-1">Just watching</option>
+        ${S.players.map((p, i) => `<option value="${i}"${L.me === i ? " selected" : ""}>${esc(p.name)}</option>`).join("")}
+      </select>
+      <p class="hint">Friends open this same link and join with the code. They need Contributor access to play; view-only friends can't join.</p>
+      <button class="btn ghost" id="leave">Leave table</button>
+    </section>`;
+  }
+  // Outside claude.ai (e.g. on GitHub Pages) there is no sync at all, so don't mention it.
+  if (!db && !window.claude) return "";
+  if (!db) {
+    return `<section class="panel" aria-labelledby="tb">
+      <div class="label" id="tb">Playing on several phones</div>
+      <p class="hint">${dbTried ? "Sign in to claude.ai and open this page from its link to play on several phones. One phone works fine without it." : "Checking whether this page can sync…"}</p>
+    </section>`;
+  }
+  return `<section class="panel" aria-labelledby="tb">
+    <div class="label" id="tb">Playing on several phones</div>
+    <p class="hint">Start a table and everyone with the link joins with its code. Each phone sees the board, votes on showdowns and gets its own secret missions.</p>
+    <div class="row">
+      <button class="btn" id="host" type="button">Start a table</button>
+      <input id="joinCode" type="text" class="field" placeholder="Code" maxlength="4" autocomplete="off" aria-label="Table code" style="text-transform:uppercase">
+      <button class="btn ghost" id="join" type="button">Join</button>
+    </div>
+  </section>`;
+}
+
+function gameView(flip) {
+  const c = S.card, cur = S.players[S.turn];
+  const rail = `<div class="rail" role="list">${S.players.map((p, i) => `
+    <button type="button" role="listitem" class="chip${i === S.turn ? " now" : ""}${S.gift && i !== S.turn ? " pick" : ""}" data-i="${i}" aria-label="${esc(p.name)}, ${p.sips} sips. Add a sip">
+      <span class="n">${esc(p.name)}${i === L.me ? " (you)" : ""}</span><span class="s">${p.sips} sip${p.sips === 1 ? "" : "s"}</span><span class="pm">~${fmt(promille(p))}</span>
+    </button>`).join("")}</div>`;
+
+  let card, actions;
+  if (!c) {
+    card = `<button type="button" class="card back" id="drawBtn" aria-label="Draw a card"><span class="big">Draw</span><p>Tap to flip the next card</p><p style="font-family:var(--mono);font-size:.8rem">${S.deck.length || "fresh"} left in deck${S.level === 4 ? ` · ${LEVELS[effLevel() - 1][0]}` : ""}</p></button>`;
+    actions = `<button class="btn ghost" id="skipTurn">Skip turn</button>`;
+  } else if (c.kind === "secret" && !canSee(c.p)) {
+    card = `<div class="card hidden"><span class="big">Secret Mission</span><p>Only ${esc(S.players[c.p].name)}'s phone can open this.</p></div>`;
+    actions = `<button class="btn ghost" data-act="done">Skip it</button>`;
+  } else if (c.kind === "secret" && !L.reveal) {
+    card = `<div class="card hidden${flip ? " flip" : ""}"><span class="big">Secret Mission</span><p>For ${esc(S.players[c.p].name)} only. Everyone else, look away.</p></div>`;
+    actions = `<button class="btn" id="reveal">${esc(S.players[c.p].name)}: show me</button>`;
+  } else {
+    const k = KINDS[c.kind];
+    const badge = c.kind === "water" ? "no sips" : c.sips ? `${c.sips} sip${c.sips > 1 ? "s" : ""}` : "stays in play";
+    card = `<article class="card${flip ? " flip" : ""}" style="--c:var(${k.c})">
+      <div class="kind"><b>${k.name}</b><i>${badge}</i></div>
+      <div class="txt"><div>${fill(c)}</div></div>
+      ${c.timer ? `<button type="button" class="timer" id="timerBtn">Start ${c.timer}s timer</button>` : ""}
+      <div class="foot">${footFor(c)}</div>
+    </article>`;
+    actions = actionsFor(c);
+  }
+
+  const missions = S.missions.length ? `<section class="list missions" aria-labelledby="ms"><div class="label" id="ms">Secret missions in play · ${S.missions.length}</div><ul>
+    ${S.missions.map((m, i) => `<li><span>${canSee(m.p) && L.peek[m.id] ? fill(m, m.text) : `${esc(S.players[m.p].name)} is up to something.`}<small>${m.sips} sips on the line</small></span>
+      ${canSee(m.p) ? `<button type="button" class="plain" data-peek="${m.id}">${L.peek[m.id] ? "Hide" : "Peek"}</button>` : ""}
+      <button type="button" class="btn small" data-mission="${i}" data-ok="1">Pulled it off</button>
+      <button type="button" class="btn ghost small" data-mission="${i}" data-ok="0">Busted</button></li>`).join("")}
+  </ul></section>` : "";
+
+  const rules = S.rules.length ? `<section class="list" aria-labelledby="rl"><div class="label" id="rl">Rules in play · ${S.rules.length}</div><ul>
+    ${S.rules.map((r, i) => `<li><span>${r.text ? fill(r, r.text) : esc(String(r.html || "").replace(/<[^>]*>/g, ""))}<small>Made by ${esc(r.by)}</small></span><button type="button" class="plain" data-clr="${i}" aria-label="Clear rule">Clear</button></li>`).join("")}
+  </ul></section>` : "";
+
+  return `
+  <div class="top"><h1>Pour Decisions</h1>
+    <div class="tools">
+      <button class="btn ghost small" id="undo" ${S.history.length ? "" : "disabled"}>Undo</button>
+      <button class="btn ghost small" id="end">End night</button>
+      <button class="btn ghost small" id="menu">Setup</button>
+    </div>
+  </div>
+  ${rail}
+  ${refillView()}
+  <div class="turn"><span class="label">Round ${S.round}${S.length ? ` of ${S.length}` : ""} · up now</span><strong>${esc(cur.name)}</strong></div>
+  <div class="stage">${card}</div>
+  <div class="actions">${actions}</div>
+  ${missions}
+  ${rules}
+  ${boardView()}
+  ${L.code ? `<p class="sync">Table <b>${esc(L.code)}</b> · ${L.sync === "live" ? "synced" : "connecting…"}</p>` : ""}`;
+}
+
+// Refill check for the first player in the queue. Not empty when the count says it should be? Finish the drink.
+// Water and shots just get a nudge, and past the water-break line the game suggests water instead of a penalty.
+function refillView() {
+  const i = (S.refills || [])[0];
+  if (i === undefined || !S.players[i]) return "";
+  const p = S.players[i], d = DRINKS[p.drink] || DRINKS.beer, g = glassOf(p), name = esc(p.name);
+  const box = (title, text, buttons) => `<section class="refill" aria-live="polite"><b>${title}</b><p>${text}</p><div class="row">${buttons}</div></section>`;
+  if (S.penalty === i) return box(`Down it, ${name}!`, `Your ${esc(d.name.toLowerCase())} wasn't empty. Penalty: finish what's left, then pour a fresh one.`,
+    `<button class="btn" data-refill="finished">Finished, refilled</button>`);
+  if (p.drink === "none") return box(`Water check, ${name}`, `That's about a full ${esc(g.name.toLowerCase())} of water. Time to top up.`,
+    `<button class="btn" data-refill="ok">Topped up</button>`);
+  if (p.drink === "shot") return box(`Shot's gone, ${name}?`, `Pour the next one when you're ready.`,
+    `<button class="btn" data-refill="ok">Poured</button>`);
+  if (promille(p) >= WATER_AT) return box(`Refill time, ${name}`, `You're past ${WATER_AT}‰ by the estimate, so how about a water this round? No penalty either way.`,
+    `<button class="btn" data-refill="water">Water it is</button><button class="btn ghost" data-refill="ok">Refilled</button>`);
+  return box(`Refill check, ${name}`, `By the count, that's a full ${esc(d.name.toLowerCase())} (${esc(g.name)}). Is the glass empty? If not, you finish it.`,
+    `<button class="btn" data-refill="ok">Empty, refilled</button><button class="btn ghost" data-refill="left">Still some left</button>`);
+}
+
+// On a shared table only the player's own phone opens their secrets; on one phone anyone can.
+const canSee = p => !L.code || L.me === p;
+
+function boardView() {
+  const rows = S.players.map(p => ({ p, v: promille(p) })).sort((a, b) => b.v - a.v);
+  return `<section class="panel board" aria-labelledby="pb">
+    <div class="label" id="pb">Promille board · rough estimate</div>
+    <ul>${rows.map(({ p, v }) => `<li>
+      <span class="bn">${esc(p.name)}<small style="display:block;color:var(--muted);font-weight:400;font-size:.75rem">≈ ${glasses(p).toFixed(1)} ${esc(glassOf(p).name.split(" ")[0].toLowerCase())}s</small></span>
+      <span class="bar"><span style="width:${Math.min(100, v / 2 * 100)}%"></span></span>
+      <span class="bv">~${fmt(v)}<small>${tier(v)}</small></span>
+    </li>`).join("")}</ul>
+    <p class="hint">Widmark estimate from sips, drink, glass, weight and body type, minus about ${BURN}‰ per hour since each player's first sip. Past ${WATER_AT}‰ the game starts dealing water breaks. Food and real sip sizes change everything, so treat this as a joke, never as a reason to drive.</p>
+  </section>`;
+}
+
+function footFor(c) {
+  return {
+    dare: `Do it, or drink ${c.sips}.`,
+    truth: `Answer honestly, or drink ${c.sips}.`,
+    rule: "Adds to the rules list below.",
+    all: "Tap who drinks below, then confirm.",
+    duel: L.code ? `Everyone votes for the loser. Loser drinks ${c.sips}.` : `Loser drinks ${c.sips}.`,
+    gift: S.gift ? `${S.gift} left to hand out. Tap a player above.` : "All handed out.",
+    cat: "Tap who lost below, then confirm.",
+    secret: `Pull it off and ${esc(S.players[c.o].name)} drinks ${c.sips}. Get caught and you do.`,
+    water: "No sips this turn. Everyone toasts the hydration hero.",
+  }[c.kind];
+}
+
+function actionsFor(c) {
+  const P = S.players;
+  switch (c.kind) {
+    case "dare": case "truth":
+      return `<button class="btn" data-act="done">Done it</button><button class="btn ghost" data-act="refuse">Drink ${c.sips} instead</button>`;
+    case "rule":
+      return `<button class="btn" data-act="rule">Add rule & pass</button>`;
+    case "all": case "cat":
+      return pickerView(c);
+    case "duel":
+      return L.code ? voteView(c) : `<button class="btn ghost" data-act="lose" data-who="${c.p}">${esc(P[c.p].name)} lost</button><button class="btn ghost" data-act="lose" data-who="${c.o}">${esc(P[c.o].name)} lost</button>`;
+    case "gift":
+      return S.gift ? `<button class="btn ghost" data-act="done">Skip the rest</button>` : `<button class="btn" data-act="done">Next player</button>`;
+    case "secret":
+      return `<button class="btn" data-act="mission">Accept & hide</button>`;
+    case "water":
+      return `<button class="btn" data-act="water">Water's done, next</button>`;
+    default:
+      return `<button class="btn" data-act="done">Next player</button>`;
+  }
+}
+
+// Only the players tapped here get the card's sips.
+function pickerView(c) {
+  const n = S.picked.length;
+  return `<div class="picker">
+    <div class="label" style="text-align:center">Who drinks ${c.sips}?</div>
+    <div class="who">${S.players.map((p, i) => `<button type="button" data-pick="${i}" aria-pressed="${S.picked.includes(i)}">${esc(p.name)}</button>`).join("")}</div>
+    <div class="row">
+      <button class="btn ghost" data-act="pickall">${n === S.players.length ? "Clear all" : "Everyone"}</button>
+      <button class="btn" data-act="pickdone">${n === 1 ? `${esc(S.players[S.picked[0]].name)} drinks, next` : n ? `${n} drink, next` : "Nobody, next"}</button>
+    </div>
+  </div>`;
+}
+
+// Shared tables vote on showdowns: one vote per phone, majority loses, a tie means both drink.
+function voteView(c) {
+  const tally = who => Object.values(S.votes).filter(v => v === who).length;
+  const mine = S.votes[L.me];
+  const can = L.me >= 0;
+  return `<div class="picker">
+    <div class="label" style="text-align:center">${can ? "Who lost? Vote from your phone" : "Pick who you are in Setup to vote"}</div>
+    <div class="who">${[c.p, c.o].map(i => `<button type="button" data-vote="${i}" aria-pressed="${mine === i}" ${can ? "" : "disabled"}>${esc(S.players[i].name)} lost · ${tally(i)}</button>`).join("")}</div>
+    <div class="row"><button class="btn" data-act="settle" ${Object.keys(S.votes).length ? "" : "disabled"}>Settle the vote</button></div>
+  </div>`;
+}
+
+function awardsView() {
+  const P = S.players;
+  const best = (fn, unit, min = 1) => {
+    const top = Math.max(...P.map(fn));
+    if (!(top >= min)) return null;
+    return { who: P.filter(p => fn(p) === top).map(p => p.name).join(" & "), val: unit(top) };
+  };
+  const list = [
+    ["Thirstiest", best(p => p.sips, v => `${v} sips`)],
+    ["Highest flyer", best(p => Math.max(p.peak, promille(p)),v => `peaked at ~${fmt(v)}`, .01)],
+    ["Daredevil", best(p => p.done, v => `${v} dares and truths done`)],
+    ["Chicken of the night", best(p => p.refused, v => `${v} refused`)],
+    ["Lawmaker", best(p => p.made, v => `${v} rule${v > 1 ? "s" : ""} made`)],
+    ["Secret agent", best(p => p.won, v => `${v} mission${v > 1 ? "s" : ""} pulled off`)],
+    ["Hydration hero", best(p => p.water, v => `${v} water break${v > 1 ? "s" : ""}`)],
+    ["Tiny Sipper", best(p => p.nursed || 0, v => `${v} glass${v > 1 ? "es" : ""} not empty at refill`)],
+    ["Lightweight", best(p => -p.sips, v => `only ${-v} sips`, -Infinity)],
+  ].filter(a => a[1]);
+  return `
+  <header><h1>Pour Decisions</h1><p class="tag">That's the night. ${P.length} players, ${P.reduce((n, p) => n + p.sips, 0)} sips in total.</p></header>
+  <h2>The awards</h2>
+  <div class="awards">${list.map(([t, a], i) => {
+    const perch = S.theme === "halloween" && (t === "Highest flyer" || (i === 0 && !list.some(x => x[0] === "Highest flyer")));
+    return `<div class="award${perch ? " perch" : ""}">${perch ? `<div class="cat-sit" aria-hidden="true">${CAT_SIT_SVG}</div>` : ""}<b>${t}</b><strong>${esc(a.who)}</strong><span>${esc(a.val)}</span></div>`;
+  }).join("")}</div>
+  ${boardView()}
+  <div class="row">
+    <button class="btn" id="again" style="flex:1">Play again</button>
+    <button class="btn ghost" id="undo" ${S.history.length ? "" : "disabled"}>Undo</button>
+    <button class="btn ghost" id="menu">Setup</button>
+  </div>
+  <p class="foot-note">Get everyone home safe. Order a ride, nobody drives.</p>`;
+}
+
+// Timers run on each phone separately.
+let audio;
+function beep() {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = 880; o.connect(g); g.connect(audio.destination);
+    g.gain.setValueAtTime(.2, audio.currentTime); g.gain.exponentialRampToValueAtTime(.001, audio.currentTime + .6);
+    o.start(); o.stop(audio.currentTime + .6);
+  } catch {}
+  try { navigator.vibrate?.(300); } catch {}
+}
+function tickTimer() {
+  const b = $("#timerBtn");
+  if (!b || !S.card) return;
+  const key = S.tick + ":" + S.turn;
+  if (L.timerFor !== key || !L.timerEnd) { b.className = "timer"; b.textContent = `Start ${S.card.timer}s timer`; return; }
+  const left = Math.ceil((L.timerEnd - Date.now()) / 1000);
+  if (left > 0) { b.className = "timer run"; b.textContent = `${left}s left · tap to restart`; }
+  else { b.className = "timer out"; b.textContent = "Time's up · tap to restart"; }
+}
+setInterval(() => {
+  if (!L.timerEnd) return;
+  const was = $("#timerBtn")?.classList.contains("run");
+  tickTimer();
+  if (was && Date.now() >= L.timerEnd) beep();
+}, 250);
+
+document.addEventListener("submit", e => {
+  if (e.target.id !== "addForm") return;
+  e.preventDefault();
+  const v = $("#newName").value.trim();
+  if (!v) return;
+  if (S.players.length >= 12) return toast("12 players max");
+  mutate(() => S.players.push(newPlayer({ name: v })), false);
+  $("#newName").focus();
+});
+
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.id === "meSel") { L.me = +t.value; save(); return render(); }
+  const key = t.dataset.set;
+  if (!key) return;
+  mutate(() => {
+    const p = S.players[+t.dataset.i];
+    p[key] = key === "kg" ? Math.min(200, Math.max(35, +t.value || 70)) : t.value;
+    if (key === "drink") p.glass = DRINKS[t.value].glass;
+  }, false);
+});
+
+document.addEventListener("click", e => {
+  const t = e.target.closest("button");
+  if (!t || t.disabled) return;
+  const c = S.card;
+  if (t.dataset.del !== undefined) return mutate(() => { S.players.splice(+t.dataset.del, 1); S.missions = []; S.refills = []; S.penalty = -1; if (S.turn >= S.players.length) S.turn = 0; });
+  if (t.dataset.lvl) return mutate(() => { S.level = +t.dataset.lvl; S.deck = []; }, false);
+  if (t.dataset.len) return mutate(() => { S.length = +t.dataset.len; }, false);
+  if (t.dataset.theme) return mutate(() => { S.theme = t.dataset.theme; S.deck = []; }, false);
+  if (t.id === "start") { L.screen = "game"; return mutate(() => { if (!S.deck.length) buildDeck(); if (S.turn >= S.players.length) S.turn = 0; }, false); }
+  if (t.id === "reset" || t.id === "again") { L.screen = "game"; return mutate(() => resetGame()); }
+  if (t.id === "menu") { L.screen = "setup"; return render(); }
+  if (t.id === "fan") {
+    t.getAnimations({ subtree: true }).forEach(a => { a.cancel(); a.play(); });
+    return;
+  }
+  if (t.id === "play") { L.screen = "setup"; scrollTo(0, 0); return render(); }
+  if (t.id === "continue") { L.screen = "game"; scrollTo(0, 0); return render(); }
+  if (t.id === "home") { L.screen = "welcome"; scrollTo(0, 0); return render(); }
+  if (t.id === "undo") return undo();
+  if (t.id === "end") return mutate(() => { S.over = true; });
+  if (t.id === "drawBtn") return draw();
+  if (t.id === "skipTurn") return mutate(next);
+  if (t.id === "reveal") { L.reveal = true; flipNext = true; return render(); }
+  if (t.id === "timerBtn") { audio = audio || (() => { try { return new (window.AudioContext || window.webkitAudioContext)(); } catch {} })(); L.timerFor = S.tick + ":" + S.turn; L.timerEnd = Date.now() + c.timer * 1000; return tickTimer(); }
+  if (t.id === "host") return host();
+  if (t.id === "join") return join($("#joinCode").value);
+  if (t.id === "leave") return leave();
+  if (t.dataset.peek) { L.peek[t.dataset.peek] = !L.peek[t.dataset.peek]; return render(); }
+  if (t.dataset.clr !== undefined) return mutate(() => S.rules.splice(+t.dataset.clr, 1));
+  if (t.dataset.refill) {
+    const i = S.refills[0], p = S.players[i], how = t.dataset.refill;
+    return mutate(() => {
+      if (how === "left") { S.penalty = i; p.nursed++; return; }
+      // What's left is a guess: about a quarter glass, logged so the promille estimate stays honest.
+      if (how === "finished") { const rest = Math.ceil(glassSips(p) / 4); p.sips += rest; p.first = p.first || Date.now(); p.peak = Math.max(p.peak, promille(p)); toast(`${p.name} +${rest} sips for the rest`); }
+      if (how === "water") p.water++;
+      p.sinceRefill = 0;
+      S.penalty = -1;
+      S.refills.shift();
+    });
+  }
+  if (t.dataset.mission !== undefined) {
+    const m = S.missions[+t.dataset.mission], ok = t.dataset.ok === "1";
+    return mutate(() => {
+      S.missions.splice(+t.dataset.mission, 1);
+      if (ok) { S.players[m.p].won++; sip(m.o, m.sips); bump(m.o); }
+      else { sip(m.p, m.sips); bump(m.p); }
+      toast(ok ? `${S.players[m.p].name} pulled it off. ${S.players[m.o].name} drinks ${m.sips}.` : `${S.players[m.p].name} got busted and drinks ${m.sips}.`);
+    });
+  }
+  if (t.classList.contains("chip")) {
+    const i = +t.dataset.i;
+    return mutate(() => { addSips(i, 1); if (S.gift && i !== S.turn) S.gift--; });
+  }
+  if (t.dataset.pick !== undefined) {
+    const i = +t.dataset.pick;
+    return mutate(() => { S.picked = S.picked.includes(i) ? S.picked.filter(x => x !== i) : [...S.picked, i]; }, false);
+  }
+  if (t.dataset.vote !== undefined) {
+    const i = +t.dataset.vote;
+    return mutate(() => { if (S.votes[L.me] === i) delete S.votes[L.me]; else S.votes[L.me] = i; }, false);
+  }
+  const act = t.dataset.act;
+  if (!act) return;
+  if (act === "pickall") return mutate(() => { S.picked = S.picked.length === S.players.length ? [] : S.players.map((_, i) => i); }, false);
+  mutate(() => {
+    const P = S.players;
+    if (act === "done" && (c.kind === "dare" || c.kind === "truth")) P[c.p].done++;
+    if (act === "refuse") { P[c.p].refused++; addSips(c.p, c.sips); }
+    if (act === "rule") { S.rules.push({ p: c.p, o: c.o, q: c.q, lead: c.lead, text: c.text, by: P[c.p].name }); P[c.p].made++; }
+    if (act === "lose") addSips(+t.dataset.who, c.sips);
+    if (act === "water") P[c.p].water++;
+    if (act === "mission") S.missions.push({ id: S.tick + "-" + c.p, p: c.p, o: c.o, q: c.q, lead: c.lead, text: c.text, sips: c.sips });
+    if (act === "settle") {
+      const a = Object.values(S.votes).filter(v => v === c.p).length, b = Object.values(S.votes).filter(v => v === c.o).length;
+      if (a >= b) sip(c.p, c.sips);
+      if (b >= a) sip(c.o, c.sips);
+      toast(a === b ? `Tie. ${P[c.p].name} and ${P[c.o].name} both drink ${c.sips}.` : `${P[a > b ? c.p : c.o].name} lost the vote and drinks ${c.sips}.`);
+    }
+    if (act === "pickdone") {
+      S.picked.forEach(i => { sip(i, c.sips); bump(i); });
+      if (S.picked.length) toast(`${S.picked.length === P.length ? "Everyone" : S.picked.map(i => P[i].name).join(", ")} +${c.sips}`);
+    }
+    next();
+  });
+});
+
+function resetGame() {
+  S.players.forEach(p => Object.assign(p, { sips: 0, first: 0, peak: 0, refused: 0, done: 0, made: 0, won: 0, water: 0, lastPicked: 0, sinceRefill: 0, nursed: 0 }));
+  S.refills = [];
+  Object.assign(S, { turn: 0, tick: 0, round: 1, card: null, rules: [], missions: [], gift: 0, picked: [], votes: {}, over: false });
+  buildDeck();
+}
+
+// Shared tables: the whole game lives in one db document, tables/<CODE>; last write wins.
+let db = null, dbTried = false, tableRef = null, unsub = null, writing = false, pending = false;
+async function push() {
+  if (!tableRef) return;
+  if (writing) { pending = true; return; }
+  writing = true;
+  do {
+    pending = false;
+    try {
+      await tableRef.set({ state: JSON.stringify(Object.assign({}, S, { history: S.history.slice(-5) })), by: TAB, at: Date.now() });
+    } catch (e) {
+      toast(e?.code === "permission_denied" ? "You can watch but not play. Ask the host for Contributor access." : "Couldn't sync that change. Check your connection.");
+    }
+  } while (pending);
+  writing = false;
+}
+function listen(code) {
+  if (unsub) unsub();
+  L.code = code; L.sync = "";
+  tableRef = db.doc("tables/" + code);
+  unsub = tableRef.onSnapshot(snap => {
+    L.sync = "live";
+    if (snap.exists) {
+      const d = snap.data();
+      if (d.by !== TAB) {
+        try { S = fresh(JSON.parse(d.state)); } catch { return toast("Got a broken update from another phone. Ignored it."); }
+      }
+    }
+    render();
+  }, () => { L.sync = ""; toast("Lost the table connection."); render(); });
+  save();
+}
+async function host() {
+  const abc = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const code = Array.from({ length: 4 }, () => abc[Math.floor(Math.random() * abc.length)]).join("");
+  L.me = S.players.length ? 0 : -1;
+  listen(code);
+  await push();
+  toast(`Table ${code} is open`);
+}
+async function join(raw) {
+  const code = String(raw || "").trim().toUpperCase();
+  if (!/^[A-Z]{4}$/.test(code)) return toast("Enter the 4-letter table code");
+  try {
+    const snap = await db.doc("tables/" + code).get();
+    if (!snap.exists) return toast(`No table called ${code}. Check the code with the host.`);
+    S = fresh(JSON.parse(snap.data().state));
+    L.me = -1;
+    listen(code);
+    toast(`Joined ${code}. Pick who you are below.`);
+  } catch { toast("Couldn't reach that table. Try again."); }
+}
+function leave() {
+  if (unsub) unsub();
+  unsub = null; tableRef = null; L.code = ""; L.sync = ""; L.me = -1;
+  render();
+}
+
+// Halloween Special: every few seconds there's a chance a bat (sometimes two or three) flaps across the screen
+// in a wavy line. Only outside the welcome screen, which has its own bats, and never with reduced motion.
+const BAT_SVG = `<svg viewBox="0 0 40 22"><g class="wings" fill="#000"><path d="M20 9 C17 4 12 2 5 3 C8 5 8 8 6 10 C9 9 11 10 12 12 C14 10 16 11 17 13 L20 15 L23 13 C24 11 26 10 28 12 C29 10 31 9 34 10 C32 8 32 5 35 3 C28 2 23 4 20 9 Z"/><path d="M18 8 L18.5 5 L20 7.5 L21.5 5 L22 8 Z"/></g></svg>`;
+function spawnBat(delay = 0) {
+  const layer = $("#batLayer");
+  const w = innerWidth, h = innerHeight;
+  const size = 44 + Math.random() * 30;
+  const ltr = Math.random() < .5;
+  const y0 = h * (.08 + Math.random() * .6), y1 = y0 + (Math.random() - .5) * h * .3;
+  const x0 = ltr ? -size * 2 : w + size, x1 = ltr ? w + size : -size * 2;
+  const b = document.createElement("div");
+  b.className = "bat-fly";
+  b.style.width = size + "px";
+  b.innerHTML = BAT_SVG;
+  layer.appendChild(b);
+  const frames = [0, .25, .5, .75, 1].map((t, i) => ({
+    transform: `translate(${x0 + (x1 - x0) * t}px, ${y0 + (y1 - y0) * t + (i % 2 ? -1 : 1) * 22}px) rotate(${(i % 2 ? -1 : 1) * 8}deg)`,
+  }));
+  return b.animate(frames, { duration: 4200 + Math.random() * 2800, delay, easing: "ease-in-out", fill: "both" }).finished.then(() => b.remove(), () => b.remove());
+}
+// A classic green witch on a brown broom, drawn facing right; flipped when she flies left.
+const WITCH_SVG = `<svg viewBox="0 0 120 72">
+  <path d="M20 52 L2 44 L5 51 L0 57 L6 60 L3 66 L22 58 Z" fill="#c8963e"/>
+  <path d="M20 53 L6 47 M20 55 L4 56 M21 57 L7 63" stroke="#9c6e2a" stroke-width="1.2"/>
+  <path d="M18 51 L23 49 L25 57 L20 59 Z" fill="#6b4122"/>
+  <path d="M22 54 L104 41" stroke="#7a4a24" stroke-width="4" stroke-linecap="round"/>
+  <path d="M52 30 Q34 29 18 41 L23 42 L20 46 L27 44 L26 48 L33 45 Q40 44 46 46 Z" fill="#2b1838"/>
+  <path d="M45 50 Q46 31 57 27 Q68 31 72 48 Q60 53 45 50 Z" fill="#17101f"/>
+  <path d="M66 47 L80 50 L88 45 L84 53 L70 55 Z" fill="#17101f"/>
+  <path d="M60 35 Q70 39 78 44" stroke="#17101f" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+  <path d="M77 41 l5 1 l-1 2 l4 0 l-2 2 l3 1 l-5 1 l-3 -2 Z" fill="#7d8a4e"/>
+  <path d="M52 20 Q40 22 34 36 L38 32 L37 39 L42 31 L43 38 L47 29 Q50 26 54 26 Z" fill="#5b5560"/>
+  <path d="M55 24 Q49 31 49 41 L52 35 L54 40 L55 31 Z" fill="#3e3a44"/>
+  <path d="M52 20 Q51 31 57 32 Q63 33 66 29 Q67 24 66 19 Q60 15 52 20 Z" fill="#7d8a4e"/>
+  <path d="M63 20 Q70 21 74 26 Q76 29 73 31 Q72 27 68 26 L64 25 Z" fill="#6c7943"/>
+  <circle cx="70" cy="26" r="1.2" fill="#55602f"/>
+  <path d="M58 30 Q63 34 70 31 Q66 37 59 33 Z" fill="#6c7943"/>
+  <path d="M57 19 L64 21" stroke="#0e0a10" stroke-width="1.6" stroke-linecap="round"/>
+  <ellipse cx="61" cy="22.6" rx="2.2" ry="1.4" fill="#e8d84a"/>
+  <circle cx="61.6" cy="22.6" r=".8" fill="#b11a1a"/>
+  <path d="M58 28 Q62 30.5 66 27.5" stroke="#1f1a12" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+  <path d="M60 28.6 l.7 1.5 l.7 -1.2 M63.4 28.9 l.6 1.3 l.6 -1.5" stroke="#e9e3c4" stroke-width=".9" fill="none"/>
+  <ellipse cx="58" cy="16.5" rx="14" ry="3" fill="#120d18"/>
+  <path d="M50 16 Q54 7 52 0 Q63 6 66 16 Z" fill="#120d18"/>
+  <path d="M51.5 13.5 Q58 11 65 13.5" stroke="#7b3fa0" stroke-width="2.4" fill="none"/>
+</svg>`;
+function spawnWitch() {
+  const w = innerWidth, h = innerHeight, size = 82 + Math.random() * 18;
+  const ltr = Math.random() < .5;
+  const y = h * (.12 + Math.random() * .45);
+  const x0 = ltr ? -size - 20 : w + 20, x1 = ltr ? w + 20 : -size - 20;
+  const el = document.createElement("div");
+  el.className = "bat-fly";
+  el.style.width = size + "px";
+  el.innerHTML = WITCH_SVG;
+  if (!ltr) el.firstElementChild.style.transform = "scaleX(-1)";
+  $("#batLayer").appendChild(el);
+  const frames = [0, .2, .4, .6, .8, 1].map((t, i) => ({
+    transform: `translate(${x0 + (x1 - x0) * t}px, ${y - t * h * .08 + (i % 2 ? -14 : 10)}px) rotate(${(ltr ? -1 : 1) * (i % 2 ? 6 : 2)}deg)`,
+  }));
+  return el.animate(frames, { duration: 7000 + Math.random() * 2000, easing: "ease-in-out", fill: "both" }).finished
+    .then(() => el.remove(), () => el.remove());
+}
+
+// A cute black cat that strolls along the bottom of the screen, legs stepping and tail swaying.
+const CAT_WALK_SVG = `<svg viewBox="0 0 100 62">
+  <path class="tail" d="M22 32 Q6 30 6 14 Q7 6 12 9 Q11 22 24 27 Z" fill="#050507"/>
+  <g class="leg a"><path d="M27 38 h6 v18 q-3 3 -6 0 Z" fill="#050507"/></g>
+  <g class="leg b"><path d="M35 38 h6 v18 q-3 3 -6 0 Z" fill="#111116"/></g>
+  <g class="leg b"><path d="M60 38 h6 v18 q-3 3 -6 0 Z" fill="#111116"/></g>
+  <g class="leg a"><path d="M67 38 h6 v18 q-3 3 -6 0 Z" fill="#050507"/></g>
+  <ellipse cx="48" cy="35" rx="27" ry="11" fill="#050507"/>
+  <path d="M66 18 L67 4 L75 14 Z M80 14 L87 4 L88 18 Z" fill="#050507"/>
+  <path d="M68.5 15 L69 8 L73 13 Z M82 13 L86 8 L86.5 15 Z" fill="#4a2a3a"/>
+  <circle cx="77" cy="24" r="12.5" fill="#050507"/>
+  <ellipse cx="73" cy="23" rx="3" ry="3.4" fill="#a6e35f"/><ellipse cx="82" cy="23" rx="3" ry="3.4" fill="#a6e35f"/>
+  <ellipse cx="73.4" cy="23" rx="1" ry="2.6" fill="#000"/><ellipse cx="82.4" cy="23" rx="1" ry="2.6" fill="#000"/>
+  <circle cx="74.2" cy="21.8" r=".8" fill="#fff"/><circle cx="83.2" cy="21.8" r=".8" fill="#fff"/>
+  <path d="M77.5 28 l2 0 l-1 1.4 Z" fill="#e88aa5"/>
+  <path d="M84 28 L94 26 M84 29.5 L94 30.5 M72 28 L62 26 M72 29.5 L62 30.5" stroke="#55555f" stroke-width=".7"/>
+</svg>`;
+// The same cat sitting upright, for the awards page. The front paw (.paw) rises to its mouth for a lick.
+const CAT_SIT_SVG = `<svg viewBox="0 0 60 72">
+  <path class="tail" d="M40 66 Q58 66 56 48 Q55 40 50 43 Q53 58 38 60 Z" fill="#050507"/>
+  <path d="M12 70 Q8 42 30 36 Q52 42 48 70 Z" fill="#050507"/>
+  <ellipse cx="22" cy="69" rx="5.5" ry="3" fill="#111116"/>
+  <g class="head">
+    <path d="M17 20 L16 4 L27 14 Z M33 14 L44 4 L43 20 Z" fill="#050507"/>
+    <path d="M18.5 16 L18.5 8 L24 13.5 Z M36 13.5 L41.5 8 L41.5 16 Z" fill="#4a2a3a"/>
+    <circle cx="30" cy="25" r="14" fill="#050507"/>
+    <g class="eyes">
+      <ellipse cx="24.5" cy="24" rx="3.2" ry="3.7" fill="#a6e35f"/><ellipse cx="35.5" cy="24" rx="3.2" ry="3.7" fill="#a6e35f"/>
+      <ellipse cx="24.8" cy="24" rx="1.1" ry="2.8" fill="#000"/><ellipse cx="35.8" cy="24" rx="1.1" ry="2.8" fill="#000"/>
+      <circle cx="25.8" cy="22.6" r=".9" fill="#fff"/><circle cx="36.8" cy="22.6" r=".9" fill="#fff"/>
+    </g>
+    <path d="M29 29.5 h2.4 l-1.2 1.6 Z" fill="#e88aa5"/>
+    <path d="M30.2 31 q-1.6 2 -3.4 1 M30.2 31 q1.6 2 3.4 1" stroke="#55555f" stroke-width=".7" fill="none"/>
+    <ellipse class="tongue" cx="30.4" cy="34" rx="1.6" ry="1.4" fill="#e88aa5"/>
+    <path d="M36 30 L46 28 M36 31.5 L46 32.5 M24 30 L14 28 M24 31.5 L14 32.5" stroke="#55555f" stroke-width=".6"/>
+  </g>
+  <g class="paw"><path d="M33 52 q0 -4 3 -4 q3 0 3 4 v14 q-3 4 -6 0 Z" fill="#111116"/><ellipse cx="36" cy="68" rx="5.5" ry="3" fill="#111116"/></g>
+  <g class="raised">
+    <path d="M39 62 Q42 50 35.5 41" stroke="#111116" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+    <g class="lickpaw">
+      <ellipse cx="34" cy="38.6" rx="4.8" ry="3.8" fill="#111116" transform="rotate(-24 34 38.6)"/>
+      <ellipse cx="33.2" cy="38.8" rx="1.5" ry="1.2" fill="#e88aa5"/>
+      <circle cx="31.4" cy="37" r=".75" fill="#e88aa5"/><circle cx="33.3" cy="36.2" r=".75" fill="#e88aa5"/><circle cx="35.2" cy="36.4" r=".75" fill="#e88aa5"/>
+    </g>
+  </g>
+</svg>`;
+function spawnCat() {
+  const w = innerWidth, h = innerHeight, size = 74;
+  const ltr = Math.random() < .5;
+  const x0 = ltr ? -size - 10 : w + 10, x1 = ltr ? w + 10 : -size - 10;
+  const y = h - size * .62 - 4;
+  const el = document.createElement("div");
+  el.className = "bat-fly cat-walk";
+  el.style.width = size + "px";
+  el.innerHTML = CAT_WALK_SVG;
+  if (!ltr) el.firstElementChild.style.transform = "scaleX(-1)";
+  $("#batLayer").appendChild(el);
+  const frames = [0, .25, .5, .75, 1].map((t, i) => ({ transform: `translate(${x0 + (x1 - x0) * t}px, ${y + (i % 2 ? -1.5 : 0)}px)` }));
+  return el.animate(frames, { duration: Math.max(9000, w * 28), easing: "linear", fill: "both" }).finished
+    .then(() => el.remove(), () => el.remove());
+}
+
+// Christmas snowfall: a fixed set of flakes with random size, speed and drift, shown only while the Christmas theme is on.
+$("#snowLayer").innerHTML = Array.from({ length: 34 }, () => {
+  const s = 2 + Math.random() * 4;
+  return `<i style="left:${Math.random() * 100}%;--s:${s}px;--o:${.35 + Math.random() * .5};--d:${7 + Math.random() * 9}s;--delay:${-Math.random() * 16}s;--drift:${(Math.random() - .5) * 80}px"></i>`;
+}).join("");
+
+// Santa and Krampus, both drawn running to the right; legs swing via .runner .leg.
+const SANTA_SVG = `<svg viewBox="0 0 70 84">
+  <g class="leg a"><path d="M26 58 h8 v14 h-8 Z" fill="#c42235"/><path d="M24 70 h12 q4 0 4 5 h-16 Z" fill="#111"/></g>
+  <g class="leg b"><path d="M36 58 h8 v14 h-8 Z" fill="#a51d2c"/><path d="M34 70 h12 q4 0 4 5 h-16 Z" fill="#111"/></g>
+  <ellipse cx="35" cy="46" rx="19" ry="17" fill="#d42a2a"/>
+  <path d="M17 54 Q35 66 53 54 L53 59 Q35 70 17 59 Z" fill="#f4f0ea"/>
+  <rect x="16" y="46" width="38" height="6" fill="#111"/><rect x="31" y="45" width="8" height="8" rx="1" fill="none" stroke="#ffd166" stroke-width="2"/>
+  <path d="M44 38 Q56 36 62 44" stroke="#d42a2a" stroke-width="7" fill="none" stroke-linecap="round"/>
+  <circle cx="63" cy="45" r="4" fill="#111"/><rect x="55" y="38" width="5" height="7" rx="2" fill="#f4f0ea" transform="rotate(30 57 41)"/>
+  <circle cx="40" cy="22" r="10" fill="#f6c9a8"/>
+  <path d="M30 24 Q30 40 40 42 Q52 42 51 26 Q46 30 40 29 Q34 30 30 24 Z" fill="#f4f0ea"/>
+  <circle cx="49" cy="23" r="2.4" fill="#e3796d"/>
+  <circle cx="44" cy="19" r="1.3" fill="#222"/>
+  <path d="M28 16 Q36 2 50 12 L52 15 Q40 10 30 18 Z" fill="#d42a2a"/><path d="M30 14 Q20 10 14 18" stroke="#d42a2a" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <circle cx="13" cy="19" r="4" fill="#f4f0ea"/>
+  <path d="M28 17 Q40 9 52 15" stroke="#f4f0ea" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+</svg>`;
+const KRAMPUS_SVG = `<svg viewBox="0 0 70 84">
+  <g class="leg a"><path d="M27 56 L24 70 L30 72 L33 58 Z" fill="#2a1a10"/><path d="M22 70 h9 l1 5 h-11 Z" fill="#0d0907"/></g>
+  <g class="leg b"><path d="M37 56 L40 70 L46 70 L43 56 Z" fill="#3b2618"/><path d="M38 70 h9 l1 5 h-11 Z" fill="#0d0907"/></g>
+  <path d="M14 58 L18 34 Q34 24 50 34 L56 58 L50 54 L46 60 L40 55 L34 61 L28 55 L22 61 Z" fill="#3b2618"/>
+  <path d="M20 40 l4 3 M28 36 l3 4 M44 38 l-2 4 M36 46 l3 3" stroke="#56392a" stroke-width="2" stroke-linecap="round"/>
+  <path d="M46 38 Q56 40 60 48" stroke="#3b2618" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M58 30 L66 62" stroke="#7a4a24" stroke-width="2.4"/><path d="M58 30 L63 28 M59 34 L65 33 M60 38 L66 38" stroke="#7a4a24" stroke-width="1.6"/>
+  <path d="M58 47 q4 -2 5 2 q-3 3 -5 -2 Z" fill="#2a1a10"/>
+  <path d="M30 26 Q30 12 42 12 Q54 13 54 26 Q53 34 42 35 Q31 34 30 26 Z" fill="#4a2f1f"/>
+  <path d="M33 16 Q22 6 26 -2 Q30 8 37 13 Z M47 13 Q54 4 62 6 Q54 10 51 17 Z" fill="#d9c9a8"/>
+  <ellipse cx="45" cy="22" rx="2.6" ry="2" fill="#ffd23f"/><circle cx="45.6" cy="22" r=".9" fill="#b11a1a"/>
+  <path d="M41 19 L49 20" stroke="#1a0f08" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M44 29 Q50 32 54 28" stroke="#1a0f08" stroke-width="1.4" fill="none"/>
+  <path d="M49 30 Q54 38 50 44 Q48 38 46 31 Z" fill="#d1334a"/>
+  <path d="M46 29.5 l1 2.4 l1 -2.2 M51 29 l.9 2.2 l1 -2.4" stroke="#f1ead0" stroke-width=".9" fill="none"/>
+</svg>`;
+// One chase = one crossing: the chaser runs a stride behind the one being chased. Roles swap every time.
+let santaChases = true;
+function spawnChase() {
+  const w = innerWidth, h = innerHeight, size = 64, gap = 74;
+  const ltr = Math.random() < .5;
+  const front = santaChases ? KRAMPUS_SVG : SANTA_SVG, back = santaChases ? SANTA_SVG : KRAMPUS_SVG;
+  santaChases = !santaChases;
+  const y = h - size * 1.2 - 6;
+  const dur = Math.max(6500, w * 17);
+  const run = (svg, lead) => {
+    const el = document.createElement("div");
+    el.className = "bat-fly runner";
+    el.style.width = size + "px";
+    el.innerHTML = svg;
+    if (!ltr) el.firstElementChild.style.transform = "scaleX(-1)";
+    $("#batLayer").appendChild(el);
+    const off = lead ? 0 : gap;
+    const x0 = ltr ? -size - off : w + off, x1 = ltr ? w + gap + size - off : -size - gap - size + off;
+    const frames = [0, .2, .4, .6, .8, 1].map((t, i) => ({ transform: `translate(${x0 + (x1 - x0) * t}px, ${y + (i % 2 ? -5 : 0)}px)` }));
+    return el.animate(frames, { duration: dur, easing: "linear", fill: "both" }).finished.then(() => el.remove(), () => el.remove());
+  };
+  return Promise.all([run(front, true), run(back, false)]);
+}
+
+// Seasonal visitors take turns, one crossing on screen at a time, 20 seconds apart, so each shows up about once a minute.
+// Halloween: witch first (4 seconds after the page opens), then the cat, then a bat. Christmas: Santa and Krampus chase each other.
+const CRITTERS_BY_THEME = { halloween: [spawnWitch, spawnCat, () => spawnBat(0)], christmas: [spawnChase] };
+let critterBusy = false, critterNext = Date.now() + 4000, critterIdx = 0;
+setInterval(() => {
+  if (!S || S.theme === "classic" || document.hidden || critterBusy || Date.now() < critterNext) return;
+  if (S.over && L.screen === "game") return; // the awards page belongs to the sitting cat alone
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  critterBusy = true;
+  const list = CRITTERS_BY_THEME[S.theme];
+  const crossing = list[critterIdx++ % list.length]();
+  const giveUp = new Promise(r => setTimeout(r, 20000)); // never let a stalled animation block the queue
+  Promise.race([crossing, giveUp]).finally(() => { critterBusy = false; critterNext = Date.now() + 20000; });
+}, 1000);
+
+// Promille drops over time, so refresh the numbers every minute while playing.
+setInterval(() => { if (S && L.screen === "game") render(); }, 60000);
+
+function start(data) {
+  S = fresh(data && data.S ? data.S : load());
+  const loc = (data && data.L) || loadLocal();
+  L.me = loc.me ?? -1;
+  if (data && data.L) L.screen = data.L.screen || "welcome";
+  render();
+  (window.claude?.use ? window.claude.use("db") : Promise.resolve(null)).then(d => {
+    db = d; dbTried = true;
+    if (db && loc.code) listen(loc.code);
+    render();
+  }, () => { dbTried = true; render(); });
+}
+window.claude?.hot?.snapshot?.(() => ({ S, L: { screen: L.screen, code: L.code, me: L.me } }));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
+</html>
